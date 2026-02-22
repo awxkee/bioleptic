@@ -27,6 +27,5 @@
 # // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-cargo install wasm-pack
-wasm-pack build --target nodejs --release
-wasm-pack publish
+maturin build --release
+maturin publish

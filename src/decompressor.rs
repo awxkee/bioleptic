@@ -28,8 +28,9 @@
  */
 use crate::mla::fmla;
 use crate::{BIOLEPTIC_HEADER_SIZE, BiolepticError, BiolepticHeader, CompressionMethod};
+use flate2::read::DeflateDecoder;
 use osclet::{BorderMode, DaubechiesFamily, DwtSize, MultiLevelDwtRef, Osclet, SymletFamily};
-use std::io::Cursor;
+use std::io::Read;
 
 /// Decompresses a Bioleptic-encoded byte slice back into `f32` samples.
 ///
@@ -97,7 +98,11 @@ pub fn decompress(bytes: &[u8]) -> Result<Vec<f32>, BiolepticError> {
 
     let compressed_data = &bytes[BIOLEPTIC_HEADER_SIZE..BIOLEPTIC_HEADER_SIZE + compressed_size];
 
-    let decoded_data = zstd::decode_all(Cursor::new(&compressed_data)).unwrap();
+    let mut decoder = DeflateDecoder::new(compressed_data);
+    let mut decoded_data = vec![0u8; decoder.total_out() as usize];
+    decoder
+        .read_to_end(&mut decoded_data)
+        .map_err(|x| BiolepticError::DecompressionError(x.to_string()))?;
 
     let quantized_data = decoded_data
         .chunks_exact(2)

@@ -1,0 +1,12 @@
+{
+  "name": "bioleptic",
+  "version": "0.1.0",
+  "description": "Wavelet-based signal compression",
+  "main": "pkg/bioleptic.js",
+  "types": "pkg/bioleptic.d.ts",
+  "scripts": {
+    "build": "wasm-pack build --target bundler --release",
+    "build:node": "wasm-pack build --target nodejs --release",
+    "build:web": "wasm-pack build --target web --release"
+  }
+}

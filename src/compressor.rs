@@ -27,8 +27,10 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::{BiolepticError, BiolepticHeader, CompressionMethod, DataType};
+use flate2::Compression;
+use flate2::write::DeflateEncoder;
 use osclet::{BorderMode, DaubechiesFamily, Osclet, SymletFamily};
-use std::io::Cursor;
+use std::io::Write;
 
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug, Default)]
 pub enum CutoffLevel {
@@ -278,7 +280,11 @@ pub fn compress(data: &[f32], options: CompressionOptions) -> Result<Vec<u8>, Bi
         .flat_map(|x| x.to_le_bytes())
         .collect::<Vec<_>>();
 
-    let compressed_data = zstd::encode_all(Cursor::new(approximation_bytes), 0)
+    let mut e = DeflateEncoder::new(Vec::new(), Compression::default());
+    e.write_all(&approximation_bytes)
+        .map_err(|x| BiolepticError::UnderlyingCompressorError(x.to_string()))?;
+    let compressed_data = e
+        .finish()
         .map_err(|x| BiolepticError::UnderlyingCompressorError(x.to_string()))?;
 
     let header = BiolepticHeader::new(
@@ -384,6 +390,7 @@ mod tests {
     #[test]
     fn test_coding() {
         let r_means = generate_ppg(500000, 120., 90.);
+        //35245
         let encoded = compress(
             &r_means,
             CompressionOptions::from_method(CompressionMethod::Sym4),

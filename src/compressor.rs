@@ -157,6 +157,7 @@ pub fn compress(data: &[f32], options: CompressionOptions) -> Result<Vec<u8>, Bi
             data.len()
         )));
     }
+    let original_length = data.len();
     let mut v_min = f32::INFINITY;
     let mut v_max = f32::NEG_INFINITY;
     let mut working_data = vec![0.; data.len()];
@@ -292,7 +293,7 @@ pub fn compress(data: &[f32], options: CompressionOptions) -> Result<Vec<u8>, Bi
         options.method,
         level as u8,
         options.scale,
-        data.len() as u32,
+        original_length as u32,
         v_min,
         v_max,
         v_mean,

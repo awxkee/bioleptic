@@ -37,15 +37,15 @@ use pyo3::types::PyBytes;
 
 #[pyclass(from_py_object)]
 #[derive(Clone)]
-pub struct PyCompressionOptions {
+pub struct BiolpCompressionOptions {
     inner: CompressionOptions,
 }
 
 #[pymethods]
-impl PyCompressionOptions {
+impl BiolpCompressionOptions {
     #[new]
-    #[pyo3(signature = (method = "cdf97", scale = 11))]
-    fn new(method: &str, scale: u8) -> PyResult<Self> {
+    #[pyo3(signature = (method = "cdf97", scale = 11, cutoff = "low"))]
+    fn new(method: &str, scale: u8, cutoff: &str) -> PyResult<Self> {
         let method = match method {
             "cdf97" => CompressionMethod::Cdf97,
             "cdf53" => CompressionMethod::Cdf53,
@@ -57,13 +57,23 @@ impl PyCompressionOptions {
                 )));
             }
         };
+        let cutoff: CutoffLevel = match cutoff {
+            "low" => CutoffLevel::Low,
+            "medium" => CutoffLevel::Medium,
+            "high" => CutoffLevel::High,
+            other => {
+                return Err(PyValueError::new_err(format!(
+                    "Unknown cutoff level {other:?}, expected 'low' or 'medium' or 'high'"
+                )));
+            }
+        };
         let scale =
             QuantizationScale::try_from(scale).map_err(|e| PyValueError::new_err(e.to_string()))?;
         Ok(Self {
             inner: CompressionOptions {
                 method,
                 scale,
-                cutoff_level: CutoffLevel::default(),
+                cutoff_level: cutoff,
             },
         })
     }
@@ -75,7 +85,7 @@ impl PyCompressionOptions {
 fn compress_signal<'py>(
     py: Python<'py>,
     data: PyReadonlyArray1<'py, f32>,
-    options: Option<PyCompressionOptions>,
+    options: Option<BiolpCompressionOptions>,
 ) -> PyResult<Bound<'py, PyBytes>> {
     let opts = options.map(|o| o.inner).unwrap_or_default();
     let slice = data.as_slice()?;
@@ -93,7 +103,7 @@ fn decompress_signal<'py>(py: Python<'py>, data: &[u8]) -> PyResult<Bound<'py, P
 
 #[pymodule]
 fn bioleptic(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_class::<PyCompressionOptions>()?;
+    m.add_class::<BiolpCompressionOptions>()?;
     m.add_function(wrap_pyfunction!(compress_signal, m)?)?;
     m.add_function(wrap_pyfunction!(decompress_signal, m)?)?;
     Ok(())

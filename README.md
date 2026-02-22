@@ -14,8 +14,8 @@ Wavelet-based signal compression for physiological data (ECG, PPG, accelerometry
 ### Rust
 
 ```rust
-let compressed = compress( & signal, CompressionOptions::default ()) ?;
-let recovered  = decompress( & compressed) ?;
+let compressed = compress(&signal, CompressionOptions::default())?;
+let recovered  = decompress(&compressed)?;
 ```
 
 ### Python
@@ -25,9 +25,9 @@ pip install bioleptic
 ```
 
 ```python
-from bioleptic import compress_signal, decompress_signal, CompressionOptions
+from bioleptic import compress_signal, decompress_signal, BiolpCompressionOptions
 
-compressed = compress_signal(signal, CompressionOptions("cdf97", 11))
+compressed = compress_signal(signal, BiolpCompressionOptions("cdf97", 11, "low"))
 recovered  = decompress_signal(compressed)
 ```
 
@@ -42,8 +42,16 @@ import init, {compress_signal, decompress_signal} from "bioleptic";
 
 await init();
 
-const compressed = compress_signal(float32Array);
-const recovered = decompress_signal(compressed);
+const signal = new Float32Array([...]);
+
+const options = new BiolpCompressionOptions(
+    BiolpCompressionMethod.Cdf97,
+    BiolpQuantizationScale.S11,
+    BiolpCutoffLevel.Medium,
+);
+
+const compressed = compress_signal(signal, options);  // Uint8Array
+const recovered  = decompress_signal(compressed);     // Float32Array
 ```
 
 ----

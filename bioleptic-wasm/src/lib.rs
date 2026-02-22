@@ -32,31 +32,78 @@ use bioleptic::{
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
-pub struct WasmCompressionOptions {
+pub struct BiolpCompressionOptions {
     inner: CompressionOptions,
 }
 
 #[wasm_bindgen]
-impl WasmCompressionOptions {
+#[derive(Copy, Clone)]
+pub enum BiolpCompressionMethod {
+    Cdf97,
+    Cdf53,
+    Sym4,
+    Db4,
+}
+
+#[wasm_bindgen]
+#[derive(Copy, Clone)]
+pub enum BiolpCutoffLevel {
+    Low,
+    Medium,
+    High,
+}
+
+#[wasm_bindgen]
+#[derive(Copy, Clone)]
+pub enum BiolpQuantizationScale {
+    S6 = 6,
+    S7 = 7,
+    S8 = 8,
+    S9 = 9,
+    S10 = 10,
+    S11 = 11,
+    S12 = 12,
+}
+
+impl From<BiolpQuantizationScale> for QuantizationScale {
+    fn from(s: BiolpQuantizationScale) -> Self {
+        match s {
+            BiolpQuantizationScale::S6 => QuantizationScale::S6,
+            BiolpQuantizationScale::S7 => QuantizationScale::S7,
+            BiolpQuantizationScale::S8 => QuantizationScale::S8,
+            BiolpQuantizationScale::S9 => QuantizationScale::S9,
+            BiolpQuantizationScale::S10 => QuantizationScale::S10,
+            BiolpQuantizationScale::S11 => QuantizationScale::S11,
+            BiolpQuantizationScale::S12 => QuantizationScale::S12,
+        }
+    }
+}
+
+#[wasm_bindgen]
+impl BiolpCompressionOptions {
     #[wasm_bindgen(constructor)]
-    pub fn new(method: &str, scale: u8) -> Result<WasmCompressionOptions, JsError> {
+    pub fn new(
+        method: BiolpCompressionMethod,
+        scale: BiolpQuantizationScale,
+        cutoff: BiolpCutoffLevel,
+    ) -> Result<BiolpCompressionOptions, JsError> {
         let method = match method {
-            "cdf97" => CompressionMethod::Cdf97,
-            "cdf53" => CompressionMethod::Cdf53,
-            "sym4" => CompressionMethod::Sym4,
-            "db4" => CompressionMethod::Db4,
-            other => {
-                return Err(JsError::new(&format!(
-                    "Unknown method {other:?}, expected 'cdf97' or 'cdf53' or 'sym4' or 'db4'"
-                )));
-            }
+            BiolpCompressionMethod::Cdf97 => CompressionMethod::Cdf97,
+            BiolpCompressionMethod::Cdf53 => CompressionMethod::Cdf53,
+            BiolpCompressionMethod::Sym4 => CompressionMethod::Sym4,
+            BiolpCompressionMethod::Db4 => CompressionMethod::Db4,
         };
-        let scale = QuantizationScale::try_from(scale).map_err(|e| JsError::new(&e.to_string()))?;
+        let cutoff = match cutoff {
+            BiolpCutoffLevel::Low => CutoffLevel::Low,
+            BiolpCutoffLevel::Medium => CutoffLevel::Medium,
+            BiolpCutoffLevel::High => CutoffLevel::High,
+        };
+        let scale = QuantizationScale::from(scale);
         Ok(Self {
             inner: CompressionOptions {
                 method,
                 scale,
-                cutoff_level: CutoffLevel::default(),
+                cutoff_level: cutoff,
             },
         })
     }
@@ -66,7 +113,7 @@ impl WasmCompressionOptions {
 #[wasm_bindgen]
 pub fn compress_signal(
     data: &[f32],
-    options: Option<WasmCompressionOptions>,
+    options: Option<BiolpCompressionOptions>,
 ) -> Result<Vec<u8>, JsError> {
     let opts = options.map(|o| o.inner).unwrap_or_default();
     compress(data, opts).map_err(|e| JsError::new(&e.to_string()))

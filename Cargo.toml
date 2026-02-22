@@ -2,6 +2,18 @@
 name = "bioleptic"
 version = "0.1.0"
 edition = "2024"
+description = "Biosignals compression"
+readme = "README.md"
+keywords = ["dsp", "ecg", "ppg"]
+license = "BSD-3-Clause OR Apache-2.0"
+authors = ["Radzivon Bartoshyk"]
+documentation = "https://github.com/awxkee/bioleptic"
+categories = ["compression"]
+homepage = "https://github.com/awxkee/bioleptic"
+repository = "https://github.com/awxkee/bioleptic"
+exclude = ["*.jpg", "/assets", "*.png", "*.sh", "/assets/*"]
+include = ["/src/", "/README.md", "/LICENSE.md", "/LICENSE-APACHE.md"]
+rust-version = "1.88.0"
 
 [dependencies]
 osclet = "0.4.0"

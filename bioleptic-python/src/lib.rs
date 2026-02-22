@@ -80,7 +80,7 @@ fn compress_signal<'py>(
     let opts = options.map(|o| o.inner).unwrap_or_default();
     let slice = data.as_slice()?;
     let bytes = compress(slice, opts).map_err(|e| PyValueError::new_err(e.to_string()))?;
-    Ok(PyBytes::new(py, &bytes).into())
+    Ok(PyBytes::new(py, &bytes))
 }
 
 /// Decompress a Bioleptic bytes object into a 1-D float32 NumPy array.

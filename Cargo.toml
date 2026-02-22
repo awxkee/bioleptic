@@ -6,3 +6,4 @@ edition = "2024"
 [dependencies]
 osclet = "0.4.0"
 zstd = "0.13.3"
+num-traits = "0.2.19"

@@ -3,3 +3,5 @@
 Cargo.lock
 bioleptic-python/Cargo.lock
 bioleptic-python/target
+bioleptic-python/.venv
+bioleptic-python/bioleptic/*.so

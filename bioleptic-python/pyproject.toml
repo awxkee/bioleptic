@@ -1,0 +1,25 @@
+[build-system]
+requires = ["maturin>=1.5"]
+build-backend = "maturin"
+
+[project]
+name = "bioleptic"
+version = "0.1.0"
+description = "Python bindings for the Bioleptic signal compressor"
+readme = "../README.md"
+license = { text = "BSD-3-Clause" }
+requires-python = ">=3.9"
+authors = [{ name = "Radzivon Bartoshyk" }]
+keywords = ["ecg", "ppg", "wavelet", "compression", "signal-processing"]
+classifiers = [
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Healthcare Industry",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: Rust",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+]
+dependencies = ["numpy>=1.24"]
+
+[tool.maturin]
+features = ["pyo3/extension-module"]
+module-name = "bioleptic.bioleptic"

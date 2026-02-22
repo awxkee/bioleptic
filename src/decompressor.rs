@@ -26,6 +26,7 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+use crate::mla::fmla;
 use crate::{BIOLEPTIC_HEADER_SIZE, BiolepticError, BiolepticHeader, CompressionMethod};
 use osclet::{BorderMode, DaubechiesFamily, DwtSize, MultiLevelDwtRef, Osclet, SymletFamily};
 use std::io::Cursor;
@@ -139,7 +140,11 @@ pub fn decompress(bytes: &[u8]) -> Result<Vec<f32>, BiolepticError> {
     let v_mean = header.mean_f32();
 
     for v in iwdt.iter_mut() {
-        *v = (*v + v_mean) * range + v_min;
+        *v = fmla(*v + v_mean, range, v_min);
+    }
+    // DWT might produce for odd sized data different size, so we'll truncate it
+    if iwdt.len() != header.signal_length as usize {
+        iwdt.resize(header.signal_length as usize, 0.);
     }
 
     Ok(iwdt)

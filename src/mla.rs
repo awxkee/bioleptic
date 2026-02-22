@@ -1,5 +1,5 @@
 /*
- * // Copyright (c) Radzivon Bartoshyk 2/2026. All rights reserved.
+ * // Copyright (c) Radzivon Bartoshyk 6/2025. All rights reserved.
  * //
  * // Redistribution and use in source and binary forms, with or without modification,
  * // are permitted provided that the following conditions are met:
@@ -26,16 +26,37 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-mod compressor;
-mod decompressor;
-mod error;
-mod header;
-mod mla;
+use num_traits::MulAdd;
+use std::ops::{Add, Mul};
 
-pub use compressor::{CompressionOptions, CutoffLevel, QuantizationScale, compress};
-pub use decompressor::decompress;
-pub use error::BiolepticError;
-pub use header::{
-    BIOLEPTIC_HEADER_SIZE, BIOLEPTIC_MAGIC, BIOLEPTIC_VERSION, BiolepticHeader, CompressionMethod,
-    DataType,
-};
+#[cfg(any(
+    all(
+        any(target_arch = "x86", target_arch = "x86_64"),
+        target_feature = "fma"
+    ),
+    target_arch = "aarch64"
+))]
+#[inline(always)]
+pub(crate) fn fmla<T: Copy + Mul<T, Output = T> + Add<T, Output = T> + MulAdd<T, Output = T>>(
+    a: T,
+    b: T,
+    c: T,
+) -> T {
+    MulAdd::mul_add(a, b, c)
+}
+
+#[cfg(not(any(
+    all(
+        any(target_arch = "x86", target_arch = "x86_64"),
+        target_feature = "fma"
+    ),
+    target_arch = "aarch64"
+)))]
+#[inline(always)]
+pub(crate) fn fmla<T: Copy + Mul<T, Output = T> + Add<T, Output = T> + MulAdd<T, Output = T>>(
+    a: T,
+    b: T,
+    c: T,
+) -> T {
+    a * b + c
+}

@@ -85,6 +85,7 @@ impl TryFrom<u8> for QuantizationScale {
     }
 }
 
+#[derive(Copy, Clone, Hash, Debug)]
 pub struct CompressionOptions {
     pub method: CompressionMethod,
     pub scale: QuantizationScale,
@@ -199,10 +200,20 @@ pub fn compress(data: &[f32], options: CompressionOptions) -> Result<Vec<u8>, Bi
         CompressionMethod::Sym4 => Osclet::make_symlet_f32(SymletFamily::Sym4, BorderMode::Wrap),
     };
 
-    const LEVEL: usize = 5;
+    let level = if data.len() < 20 {
+        1
+    } else if data.len() < 40 {
+        2
+    } else if data.len() < 60 {
+        3
+    } else if data.len() < 80 {
+        4
+    } else {
+        5
+    };
 
     let dwt = dwt_worker
-        .multi_dwt(&working_data, LEVEL)
+        .multi_dwt(&working_data, level)
         .map_err(|x| BiolepticError::UnderlyingDwtError(x.to_string()))?;
 
     if dwt.levels.is_empty() {
@@ -273,7 +284,7 @@ pub fn compress(data: &[f32], options: CompressionOptions) -> Result<Vec<u8>, Bi
     let header = BiolepticHeader::new(
         DataType::Float32,
         options.method,
-        LEVEL as u8,
+        level as u8,
         options.scale,
         data.len() as u32,
         v_min,

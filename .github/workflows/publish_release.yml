@@ -11,6 +11,7 @@ on:
 
 jobs:
   build_and_publish:
+    if: ${{ !startsWith(github.ref_name, 'py') }}
     name: Build
     runs-on: ubuntu-latest
     environment: Cargo

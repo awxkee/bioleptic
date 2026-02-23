@@ -22,9 +22,6 @@ permissions:
 jobs:
   linux:
     runs-on: ${{ matrix.platform.runner }}
-    defaults:
-      run:
-        working-directory: ./bioleptic-py
     strategy:
       fail-fast: false
       matrix:
@@ -43,6 +40,7 @@ jobs:
             target: ppc64le
     steps:
       - uses: actions/checkout@v6
+      - run: cd ./bioleptic-py
       - uses: actions/setup-python@v6
         with:
           python-version: 3.x
@@ -61,9 +59,6 @@ jobs:
 
   musllinux:
     runs-on: ${{ matrix.platform.runner }}
-    defaults:
-      run:
-        working-directory: ./bioleptic-py
     strategy:
       fail-fast: false
       matrix:
@@ -78,6 +73,7 @@ jobs:
             target: armv7
     steps:
       - uses: actions/checkout@v6
+      - run: cd ./bioleptic-py
       - uses: actions/setup-python@v6
         with:
           python-version: 3.x
@@ -96,9 +92,6 @@ jobs:
 
   windows:
     runs-on: ${{ matrix.platform.runner }}
-    defaults:
-      run:
-        working-directory: ./bioleptic-py
     strategy:
       fail-fast: false
       matrix:
@@ -114,6 +107,7 @@ jobs:
             python_arch: arm64
     steps:
       - uses: actions/checkout@v6
+      - run: cd ./bioleptic-py
       - uses: actions/setup-python@v6
         with:
           python-version: 3.13
@@ -132,9 +126,6 @@ jobs:
 
   macos:
     runs-on: ${{ matrix.platform.runner }}
-    defaults:
-      run:
-        working-directory: ./bioleptic-py
     strategy:
       fail-fast: false
       matrix:
@@ -145,6 +136,7 @@ jobs:
             target: aarch64
     steps:
       - uses: actions/checkout@v6
+      - run: cd ./bioleptic-py
       - uses: actions/setup-python@v6
         with:
           python-version: 3.x
@@ -162,11 +154,9 @@ jobs:
 
   sdist:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./bioleptic-py
     steps:
       - uses: actions/checkout@v6
+      - run: cd ./bioleptic-py
       - name: Build sdist
         uses: PyO3/maturin-action@v1
         with:
@@ -181,9 +171,6 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./bioleptic-py
     if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
     needs: [linux, musllinux, windows, macos, sdist]
     environment: Cargo

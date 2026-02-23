@@ -21,7 +21,7 @@ let recovered  = decompress(&compressed)?;
 ### Python
 
 ```bash
-pip install bioleptic
+pip install bioleptic-py
 ```
 
 ```python
@@ -34,24 +34,29 @@ recovered  = decompress_signal(compressed)
 ### JavaScript
 
 ```bash
-npm install bioleptic
+npm install bioleptic-js
 ```
 
 ```js
-import init, {compress_signal, decompress_signal} from "bioleptic";
+import {
+    BiolpCompressionMethod,
+    BiolpCompressionOptions, BiolpCutoffLevel,
+    BiolpQuantizationScale,
+    compress_signal,
+    decompress_signal
+} from "bioleptic-js";
 
-await init();
-
-const signal = new Float32Array([...]);
+const signal = new Float32Array([1.0, 2.0, 3.0, 4.0, 5.0, 1.0, 2.0, 3.0, 4.0, 5.0, 1.0, 2.0, 3.0, 4.0, 5.0]);
 
 const options = new BiolpCompressionOptions(
     BiolpCompressionMethod.Cdf97,
     BiolpQuantizationScale.S11,
-    BiolpCutoffLevel.Medium,
+    BiolpCutoffLevel.Low,
 );
 
 const compressed = compress_signal(signal, options);  // Uint8Array
-const recovered  = decompress_signal(compressed);     // Float32Array
+const recovered = decompress_signal(compressed);     // Float32Array
+console.info("Recovered signal", recovered);
 ```
 
 ----

@@ -140,7 +140,7 @@ fn threshold(details: &mut [i16], scale: QuantizationScale, cutoff_level: Cutoff
 /// Non-finite values (`NaN`, `±inf`) are substituted before processing:
 /// `NaN` and `-inf` become `0.0`, `+inf` becomes `1.0`. The signal is then
 /// mean-centered and range-normalized, transformed with a multi-level DWT,
-/// quantized to `i16`, thresholded, and entropy-coded with zstd.
+/// quantized to `i16`, thresholded, and entropy-coded with deflate.
 pub fn compress(data: &[f32], options: CompressionOptions) -> Result<Vec<u8>, BiolepticError> {
     if data.is_empty() {
         return Err(BiolepticError::UnsupportedCompressorConfiguration(

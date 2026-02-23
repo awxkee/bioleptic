@@ -34,7 +34,7 @@ use std::io::Read;
 
 /// Decompresses a Bioleptic-encoded byte slice back into `f32` samples.
 ///
-/// Reads and validates the header, entropy-decodes the payload with zstd,
+/// Reads and validates the header, entropy-decodes the payload with deflate,
 /// dequantizes coefficients, reconstructs the signal via inverse multi-level
 /// DWT, then reverses the mean-centering and range normalization applied
 /// during compression.

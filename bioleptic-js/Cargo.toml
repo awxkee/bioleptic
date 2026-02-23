@@ -1,0 +1,21 @@
+[package]
+name = "bioleptic-js"
+version = "0.1.0"
+edition = "2024"
+description = "Biosignals compression"
+readme = "../README.md"
+license = "BSD-3-Clause OR Apache-2.0"
+authors = ["Radzivon Bartoshyk"]
+documentation = "https://github.com/awxkee/bioleptic"
+categories = ["compression"]
+homepage = "https://github.com/awxkee/bioleptic"
+repository = "https://github.com/awxkee/bioleptic"
+keywords = ["compression", "ppg", "ecg", "dsp"]
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+bioleptic = { path = "../" }
+wasm-bindgen = "0.2"
+js-sys = "0.3"

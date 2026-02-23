@@ -1,5 +1,5 @@
 [workspace]
-members = ["bioleptic-python", "bioleptic-wasm"]
+members = ["bioleptic-py", "bioleptic-js"]
 exclude = ["fuzz"]
 
 [package]
@@ -8,7 +8,7 @@ version = "0.1.0"
 edition = "2024"
 description = "Biosignals compression"
 readme = "README.md"
-keywords = ["dsp", "ecg", "ppg"]
+keywords = ["compression", "ppg", "ecg", "dsp"]
 license = "BSD-3-Clause OR Apache-2.0"
 authors = ["Radzivon Bartoshyk"]
 documentation = "https://github.com/awxkee/bioleptic"

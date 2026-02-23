@@ -1,8 +1,9 @@
 /target
 .idea
 Cargo.lock
-bioleptic-python/Cargo.lock
-bioleptic-python/target
-bioleptic-python/.venv
+bioleptic-py/Cargo.lock
+bioleptic-py/target
+bioleptic-py/.venv
 bioleptic-python/bioleptic/*.so
-bioleptic-wasm/target
+bioleptic-js/target
+bioleptic-js/.npmrc

@@ -1,5 +1,5 @@
 [package]
-name = "bioleptic-python"
+name = "bioleptic-py"
 version = "0.1.0"
 edition = "2024"
 
@@ -7,7 +7,3 @@ edition = "2024"
 bioleptic = { path = "../" }
 pyo3 = { version = "0.28.2", features = ["extension-module"] }
 numpy = "0.28.0"
-
-[profile.release]
-lto = true
-codegen-units = 1

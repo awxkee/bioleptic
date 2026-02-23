@@ -4,6 +4,22 @@
   "description": "Wavelet-based signal compression",
   "main": "pkg/bioleptic.js",
   "types": "pkg/bioleptic.d.ts",
+  "license": "(BSD-3-Clause OR Apache-2.0)",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/awxkee/bioleptic"
+  },
+  "author": {
+    "name": "Radzivon Bartoshyk",
+    "url": "https://github.com/awxkee"
+  },
+  "keywords": [
+    "compression",
+    "ppg",
+    "ecg",
+    "dsp"
+  ],
+  "homepage": "https://github.com/awxkee/bioleptic",
   "scripts": {
     "build": "wasm-pack build --target bundler --release",
     "build:node": "wasm-pack build --target nodejs --release",

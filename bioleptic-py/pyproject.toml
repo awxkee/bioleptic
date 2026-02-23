@@ -14,8 +14,9 @@ keywords = ["ecg", "ppg", "wavelet", "compression", "signal-processing"]
 classifiers = [
     "Intended Audience :: Science/Research",
     "Intended Audience :: Healthcare Industry",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: Rust",
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
     "Topic :: Scientific/Engineering :: Medical Science Apps.",
 ]
 dependencies = ["numpy>=1.24"]

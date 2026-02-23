@@ -159,14 +159,15 @@ pub fn compress(data: &[f32], options: CompressionOptions) -> Result<Vec<u8>, Bi
     let mut v_max = f32::NEG_INFINITY;
     let mut working_data = vec![0.; data.len()];
     for (dst, &src) in working_data.iter_mut().zip(data.iter()) {
+        #[allow(clippy::if_same_then_else)]
         let val = if src.is_finite() {
             src
+        } else if src.is_nan() {
+            0.
+        } else if src.is_sign_negative() {
+            0.
         } else {
-            if src.is_nan() {
-                0.
-            } else {
-                if src.is_sign_negative() { 0. } else { 1. }
-            }
+            1.
         };
         v_min = val.min(v_min);
         v_max = val.max(v_max);

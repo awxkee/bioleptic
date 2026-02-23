@@ -203,6 +203,18 @@ pub fn compress(data: &[f32], options: CompressionOptions) -> Result<Vec<u8>, Bi
         CompressionMethod::Sym4 => Osclet::make_symlet_f32(SymletFamily::Sym4, BorderMode::Wrap),
     };
 
+    if working_data.len() < dwt_worker.filter_length() {
+        let target_len = dwt_worker.filter_length();
+        let current_len = working_data.len();
+        let needed = target_len - current_len;
+        // Wrap-extend: mirror the existing samples cyclically to avoid
+        // zero-padding artifacts at the filter boundary.
+        let extension = (0..needed)
+            .map(|i| working_data[i % current_len])
+            .collect::<Vec<f32>>();
+        working_data.extend_from_slice(&extension);
+    }
+
     let level = if data.len() < 20 {
         1
     } else if data.len() < 40 {
@@ -403,5 +415,19 @@ mod tests {
         let prd = prd(&r_means, &decompressed);
         assert!(prd < 0.5);
         println!("PRD {}", prd);
+    }
+
+    #[test]
+    fn test_coding_small() {
+        let r_means = [1., 2., 3., 4., 5., 6.];
+        let encoded = compress(
+            &r_means,
+            CompressionOptions::from_method(CompressionMethod::Cdf53),
+        )
+        .unwrap();
+        println!("{:?}", encoded.len());
+        let decompressed = decompress(&encoded).unwrap();
+        println!("{:?}", decompressed.len());
+        assert_eq!(decompressed.len(), r_means.len());
     }
 }

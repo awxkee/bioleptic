@@ -110,7 +110,7 @@ pub fn decompress(bytes: &[u8]) -> Result<Vec<f32>, BiolepticError> {
         .collect::<Vec<i16>>();
 
     let scale = header.scale;
-    if scale < 6 || scale > 12 {
+    if !(6..=12).contains(&scale) {
         return Err(BiolepticError::DecompressionError(format!(
             "Supported scales only [6, 12] but it was {scale}"
         )));

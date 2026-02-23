@@ -62,9 +62,9 @@ impl TryFrom<u32> for CompressionMethod {
     }
 }
 
-impl Into<u32> for CompressionMethod {
-    fn into(self) -> u32 {
-        match self {
+impl From<CompressionMethod> for u32 {
+    fn from(val: CompressionMethod) -> Self {
+        match val {
             CompressionMethod::Cdf53 => CDF53,
             CompressionMethod::Cdf97 => CDF97,
             CompressionMethod::Db4 => DB4,
@@ -86,9 +86,9 @@ impl TryFrom<u16> for DataType {
     }
 }
 
-impl Into<u16> for DataType {
-    fn into(self) -> u16 {
-        match self {
+impl From<DataType> for u16 {
+    fn from(val: DataType) -> Self {
+        match val {
             DataType::Float32 => FLOAT_32,
         }
     }
@@ -143,6 +143,7 @@ pub struct BiolepticHeader {
 
 impl BiolepticHeader {
     /// Creates a new header with the current magic and version.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         data_type: DataType,
         compression_method: CompressionMethod,

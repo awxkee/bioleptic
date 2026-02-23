@@ -42,12 +42,14 @@ pub enum CutoffLevel {
 
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug)]
 #[repr(u8)]
+#[derive(Default)]
 pub enum QuantizationScale {
     S6 = 6,
     S7 = 7,
     S8 = 8,
     S9 = 9,
     S10 = 10,
+    #[default]
     S11 = 11,
     S12 = 12,
 }
@@ -61,12 +63,6 @@ impl QuantizationScale {
     /// Returns the multiplier applied to DWT coefficients: `1 << scale`.
     pub fn multiplier(self) -> f32 {
         (1u32 << self.as_u8()) as f32
-    }
-}
-
-impl Default for QuantizationScale {
-    fn default() -> Self {
-        Self::S11
     }
 }
 
@@ -106,9 +102,10 @@ impl Default for CompressionOptions {
 
 impl CompressionOptions {
     pub fn from_method(method: CompressionMethod) -> Self {
-        let mut q = Self::default();
-        q.method = method;
-        q
+        CompressionOptions {
+            method,
+            ..Default::default()
+        }
     }
 }
 
@@ -125,10 +122,10 @@ fn threshold(details: &mut [i16], scale: QuantizationScale, cutoff_level: Cutoff
     match cutoff_level {
         CutoffLevel::Low => {}
         CutoffLevel::Medium => {
-            threshold = threshold * 3;
+            threshold *= 3;
         }
         CutoffLevel::High => {
-            threshold = threshold * 7;
+            threshold *= 7;
         }
     }
     for det in details.iter_mut() {
@@ -188,7 +185,7 @@ pub fn compress(data: &[f32], options: CompressionOptions) -> Result<Vec<u8>, Bi
         }
         v_mean = v_sum / data.len() as f32;
         for dst in working_data.iter_mut() {
-            *dst = *dst - v_mean;
+            *dst -= v_mean;
         }
     } else {
         working_data.fill(0.);
@@ -285,7 +282,7 @@ pub fn compress(data: &[f32], options: CompressionOptions) -> Result<Vec<u8>, Bi
         .map_err(|_| BiolepticError::OutOfMemoryError(total_details_length))?;
 
     for level_details in details.iter() {
-        approximation.extend_from_slice(&level_details);
+        approximation.extend_from_slice(level_details);
     }
 
     let approximation_bytes = approximation

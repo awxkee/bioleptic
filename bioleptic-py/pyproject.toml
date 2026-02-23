@@ -6,7 +6,7 @@ build-backend = "maturin"
 name = "bioleptic"
 version = "0.1.0"
 description = "Python bindings for the Bioleptic signal compressor"
-readme = "../README.md"
+readme = "README.md"
 license = { text = "BSD-3-Clause" }
 requires-python = ">=3.9"
 authors = [{ name = "Radzivon Bartoshyk" }]

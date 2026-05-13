@@ -3,7 +3,7 @@
 #
 #    maturin generate-ci github
 #
-name: PyPi publisher
+name: PyPi Python publisher
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -12,9 +12,7 @@ concurrency:
 on:
   push:
     tags:
-      - 'py*'
-  pull_request:
-  workflow_dispatch:
+      - '*'
 
 permissions:
   contents: read

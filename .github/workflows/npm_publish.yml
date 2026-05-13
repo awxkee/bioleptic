@@ -1,0 +1,148 @@
+name: Publish to npm
+
+on:
+  push:
+    tags:
+      - 'npm*'
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  build:
+    name: Build WASM
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo registry + build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Build (bundler target)
+        run: wasm-pack build --release --target bundler --out-dir pkg/bundler bioleptic-js
+
+      - name: Build (web target)
+        run: wasm-pack build --release --target web --out-dir pkg/web bioleptic-js
+
+      - name: Build (nodejs target)
+        run: wasm-pack build --release --target nodejs --out-dir pkg/nodejs bioleptic-js
+
+      - name: Upload pkg artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-pkg
+          path: bioleptic-js/pkg/
+          retention-days: 1
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Run Rust tests
+        run: cargo test --manifest-path bioleptic-js/Cargo.toml --all-features
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Run WASM tests (headless Chrome)
+        run: wasm-pack test --headless --chrome bioleptic-js
+
+  publish:
+    name: Publish to npm
+    needs: [build, test]
+    runs-on: ubuntu-latest
+    environment: Cargo
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download pkg artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: wasm-pkg
+          path: bioleptic-js/pkg/
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Extract version from Cargo.toml
+        id: version
+        run: |
+          VERSION=$(grep '^version' bioleptic-js/Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Publishing version $VERSION"
+
+      - name: Verify package versions match Cargo.toml
+        run: |
+          CARGO_VERSION="${{ steps.version.outputs.version }}"
+          for target in bundler web nodejs; do
+            PKG_VERSION=$(node -p "require('./bioleptic-js/pkg/$target/package.json').version")
+            if [ "$PKG_VERSION" != "$CARGO_VERSION" ]; then
+              echo "Version mismatch in $target: Cargo=$CARGO_VERSION pkg=$PKG_VERSION"
+              exit 1
+            fi
+          done
+
+      - name: Publish bundler package
+        if: ${{ !inputs.dry_run }}
+        run: npm publish bioleptic-js/pkg/bundler/ --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish web package
+        if: ${{ !inputs.dry_run }}
+        run: npm publish bioleptic-js/pkg/web/ --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish nodejs package
+        if: ${{ !inputs.dry_run }}
+        run: npm publish bioleptic-js/pkg/nodejs/ --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Dry run summary
+        if: ${{ inputs.dry_run }}
+        run: |
+          echo "Dry run — skipped publish for:"
+          for target in bundler web nodejs; do
+            echo "  bioleptic-js/pkg/$target/ ($(node -p "require('./bioleptic-js/pkg/$target/package.json').name")@${{ steps.version.outputs.version }})"
+          done

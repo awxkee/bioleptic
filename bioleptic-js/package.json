@@ -1,6 +1,6 @@
 {
   "name": "bioleptic",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Wavelet-based signal compression",
   "main": "pkg/bioleptic.js",
   "types": "pkg/bioleptic.d.ts",

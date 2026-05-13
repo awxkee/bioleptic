@@ -9,6 +9,10 @@ env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
 
+permissions:
+  id-token: write  # Required for OIDC
+  contents: read
+
 jobs:
   build:
     name: Build WASM
@@ -124,20 +128,14 @@ jobs:
       - name: Publish bundler package
         if: ${{ !inputs.dry_run }}
         run: npm publish bioleptic-js/pkg/bundler/ --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish web package
         if: ${{ !inputs.dry_run }}
         run: npm publish bioleptic-js/pkg/web/ --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish nodejs package
         if: ${{ !inputs.dry_run }}
         run: npm publish bioleptic-js/pkg/nodejs/ --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Dry run summary
         if: ${{ inputs.dry_run }}

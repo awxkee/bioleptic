@@ -81,7 +81,7 @@ jobs:
 
       - name: Connect
         working-directory: bioleptic-js
-        run: npm ci
+        run: npm install && npm ci
 
       - name: Extract version from Cargo.toml
         id: version

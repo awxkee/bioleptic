@@ -111,13 +111,13 @@ impl CompressionOptions {
 
 fn threshold(details: &mut [i16], scale: QuantizationScale, cutoff_level: CutoffLevel) {
     let mut threshold = match scale {
-        QuantizationScale::S6 => 1,
-        QuantizationScale::S7 => 1,
-        QuantizationScale::S8 => 2,
-        QuantizationScale::S9 => 2,
-        QuantizationScale::S10 => 3,
-        QuantizationScale::S11 => 3,
-        QuantizationScale::S12 => 4,
+        QuantizationScale::S6 => 0,
+        QuantizationScale::S7 => 0,
+        QuantizationScale::S8 => 1,
+        QuantizationScale::S9 => 1,
+        QuantizationScale::S10 => 2,
+        QuantizationScale::S11 => 2,
+        QuantizationScale::S12 => 3,
     };
     match cutoff_level {
         CutoffLevel::Low => {}
@@ -133,6 +133,16 @@ fn threshold(details: &mut [i16], scale: QuantizationScale, cutoff_level: Cutoff
             *det = 0;
         }
     }
+}
+
+fn compute_max_levels(signal_len: usize, filter_length: usize) -> usize {
+    if signal_len < filter_length {
+        return 1;
+    }
+    // floor(log2(signal_len / filter_length))
+    let ratio = signal_len / filter_length;
+    let max = usize::BITS as usize - ratio.leading_zeros() as usize - 1;
+    max.clamp(1, 8)
 }
 
 /// Compresses a slice of `f32` samples into a Bioleptic-encoded byte vector.
@@ -222,7 +232,7 @@ pub fn compress(data: &[f32], options: CompressionOptions) -> Result<Vec<u8>, Bi
     } else if data.len() < 80 {
         4
     } else {
-        5
+        compute_max_levels(data.len(), dwt_worker.filter_length())
     };
 
     let dwt = dwt_worker
@@ -402,17 +412,25 @@ mod tests {
     fn test_coding() {
         let r_means = generate_ppg(500000, 120., 90.);
         //35245
+        let raw_bytes = r_means.len() * size_of::<f32>();
         let encoded = compress(
             &r_means,
-            CompressionOptions::from_method(CompressionMethod::Sym4),
+            CompressionOptions::from_method(CompressionMethod::Cdf97),
         )
         .unwrap();
-        println!("{:?}", encoded.len());
+        let compressed_bytes = encoded.len();
         let decompressed = decompress(&encoded).unwrap();
-        println!("{:?}", decompressed.len());
-        let prd = prd(&r_means, &decompressed);
-        assert!(prd < 0.5);
-        println!("PRD {}", prd);
+        let cr = raw_bytes as f32 / compressed_bytes as f32;
+        let prd_val = prd(&r_means, &decompressed);
+        assert!(prd_val < 0.5, "got PRD {prd_val}");
+        println!(
+            "n={:5}  raw={:8}  compressed={:8}  cr={:6.2}:1  PRD={:.4}%",
+            r_means.len(),
+            raw_bytes,
+            compressed_bytes,
+            cr,
+            prd_val
+        );
     }
 
     #[test]

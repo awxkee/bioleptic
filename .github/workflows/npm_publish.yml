@@ -99,15 +99,15 @@ jobs:
 
       - name: Publish bundler package
         if: ${{ !inputs.dry_run }}
-        run: npm publish bioleptic-js/pkg/bundler/ --provenance --access public
+        run: npm publish bioleptic-js/pkg/bundler/ --access public
 
       - name: Publish web package
         if: ${{ !inputs.dry_run }}
-        run: npm publish bioleptic-js/pkg/web/ --provenance --access public
+        run: npm publish bioleptic-js/pkg/web/ --access public
 
       - name: Publish nodejs package
         if: ${{ !inputs.dry_run }}
-        run: npm publish bioleptic-js/pkg/nodejs/ --provenance --access public
+        run: npm publish bioleptic-js/pkg/nodejs/ --access public
 
       - name: Dry run summary
         if: ${{ inputs.dry_run }}

@@ -121,7 +121,6 @@ jobs:
           # so rename both the main file and the background glue to .cjs and
           # fix the internal require() reference between them.
           mv dist/nodejs/bioleptic_js.js    dist/nodejs/bioleptic_js.cjs
-          mv dist/nodejs/bioleptic_js_bg.js dist/nodejs/bioleptic_js_bg.cjs
           sed -i "s|require('./bioleptic_js_bg.js')|require('./bioleptic_js_bg.cjs')|g" \
             dist/nodejs/bioleptic_js.cjs
 

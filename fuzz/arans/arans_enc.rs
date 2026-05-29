@@ -234,7 +234,30 @@ pub fn encode_stream(data: &[u8]) -> Vec<u8> {
     out
 }
 
-pub fn decode_stream(stream: &[u8]) -> Result<Vec<u8>, AransError> {
+/// Drop-in replacement for `lzrans::encode` on the i16 coefficient byte stream.
+pub(crate) fn encode_stream(data: &[u8]) -> Vec<u8> {
+    if data.len() <= 5 {
+        return data.to_vec();
+    }
+    let ncoeff = data.len() / 2;
+    let (lo, hi): (Vec<_>, Vec<_>) = data.as_chunks::<2>().0.iter().map(|c| (c[0], c[1])).unzip();
+    let ctx = pick_ctx_bits(ncoeff);
+    let elo = encode_plane(&lo, ctx);
+    let ehi = encode_plane(&hi, ctx);
+    let mut out = Vec::with_capacity(elo.len() + ehi.len() + 16);
+    out.push((data.len() & 1) as u8); // parity flag: odd trailing byte present?
+    out.push(ctx as u8);
+    wv(ncoeff as u64, &mut out);
+    wv(elo.len() as u64, &mut out);
+    out.extend_from_slice(&elo);
+    out.extend_from_slice(&ehi);
+    if data.len() & 1 == 1 {
+        out.push(data[data.len() - 1]); // odd tail byte verbatim
+    }
+    out
+}
+
+pub(crate) fn decode_stream(stream: &[u8]) -> Result<Vec<u8>, AransError> {
     // Mirror encode: empty -> empty, and the <=5 byte verbatim passthrough.
     if stream.is_empty() {
         return Ok(Vec::new());

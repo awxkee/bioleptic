@@ -96,8 +96,10 @@ impl From<DataType> for u16 {
 
 pub const BIOLEPTIC_MAGIC: [u8; 4] = *b"BILP";
 
+pub const FORMAT_MAJOR: u8 = 1;
+pub const FORMAT_MINOR: u8 = 1;
 /// Current format version.
-pub const BIOLEPTIC_VERSION: u16 = u16::from_le_bytes([1, 0]);
+pub const BIOLEPTIC_VERSION: u16 = u16::from_le_bytes([FORMAT_MAJOR, FORMAT_MINOR]);
 
 /// Fixed size of the header in bytes.
 pub const BIOLEPTIC_HEADER_SIZE: usize = size_of::<BiolepticHeader>();
@@ -229,15 +231,15 @@ impl BiolepticHeader {
 
         let buf = &buf[..BIOLEPTIC_HEADER_SIZE];
 
-        let magic: [u8; 4] = buf[0..4].try_into().unwrap();
+        let magic: [u8; 4] = buf[..4].try_into().unwrap();
         if magic != BIOLEPTIC_MAGIC {
             return Err(BiolepticError::InvalidMagic(magic));
         }
-
-        let version = u16::from_le_bytes(buf[4..6].try_into().unwrap());
-        if version != BIOLEPTIC_VERSION {
-            return Err(BiolepticError::InvalidVersion(version.to_ne_bytes()));
+        let (major, minor) = (buf[4], buf[5]);
+        if major != 1 {
+            return Err(BiolepticError::InvalidVersion([major, minor]));
         }
+        let version: [u8; 2] = buf[4..6].try_into().unwrap();
 
         let data_type = u16::from_le_bytes(buf[6..8].try_into().unwrap());
         let compression_method = u32::from_le_bytes(buf[8..12].try_into().unwrap());
@@ -245,7 +247,7 @@ impl BiolepticHeader {
         // validate enums
         let v_data_type = DataType::try_from(data_type)?;
         let _ = CompressionMethod::try_from(compression_method)?;
-        let _ = QuantizationScale::try_from(buf[13]);
+        let _ = QuantizationScale::try_from(buf[13])?;
         let _ = EntropyCoder::try_from(buf[14])?;
 
         let f_min = u32::from_le_bytes(buf[20..24].try_into().unwrap());
@@ -268,7 +270,7 @@ impl BiolepticHeader {
 
         Ok(Self {
             magic,
-            version,
+            version: u16::from_le_bytes(version),
             data_type,
             compression_method: buf[8..12].try_into().unwrap(),
             levels: buf[12],

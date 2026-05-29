@@ -38,5 +38,5 @@ pub use decompressor::decompress;
 pub use error::BiolepticError;
 pub use header::{
     BIOLEPTIC_HEADER_SIZE, BIOLEPTIC_MAGIC, BIOLEPTIC_VERSION, BiolepticHeader, CompressionMethod,
-    DataType, EntropyCoder,
+    DataType, EntropyCoder, FORMAT_MAJOR, FORMAT_MINOR,
 };

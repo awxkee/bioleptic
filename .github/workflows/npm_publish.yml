@@ -79,6 +79,9 @@ jobs:
         with:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false
+
+      - run: npm install -g npm@latest
 
       - name: Extract version from Cargo.toml
         id: version
@@ -133,5 +136,3 @@ jobs:
       - name: Publish dist/
         working-directory: bioleptic-js/dist
         run: npm install && npm ci && npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

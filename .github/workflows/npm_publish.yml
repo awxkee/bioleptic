@@ -18,7 +18,7 @@ jobs:
     name: Build WASM
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -50,7 +50,7 @@ jobs:
         run: wasm-pack build --release --target nodejs --out-dir pkg/nodejs bioleptic-js
 
       - name: Upload pkg artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: wasm-pkg
           path: bioleptic-js/pkg/
@@ -66,16 +66,16 @@ jobs:
       id-token: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Download pkg artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: wasm-pkg
           path: bioleptic-js/pkg/
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'

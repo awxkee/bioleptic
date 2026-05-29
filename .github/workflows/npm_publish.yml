@@ -80,10 +80,6 @@ jobs:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
 
-      - name: Install dependencies
-        working-directory: bioleptic-js
-        run: npm install && npm ci
-
       - name: Extract version from Cargo.toml
         id: version
         run: |
@@ -111,11 +107,11 @@ jobs:
 
           # Copy build outputs, excluding per-build package.json and .gitignore
           rsync -a --exclude='package.json' --exclude='.gitignore' \
-            bioleptic-js/pkg/bundler/ dist/bundler/
+            pkg/bundler/ dist/bundler/
           rsync -a --exclude='package.json' --exclude='.gitignore' \
-            bioleptic-js/pkg/web/ dist/web/
+            pkg/web/ dist/web/
           rsync -a --exclude='package.json' --exclude='.gitignore' \
-            bioleptic-js/pkg/nodejs/ dist/nodejs/
+            pkg/nodejs/ dist/nodejs/
 
           # wasm-pack nodejs target emits CJS files with .js extensions.
           # Under "type":"module" Node refuses to load .js files with require(),
@@ -125,12 +121,10 @@ jobs:
           sed -i "s|require('./bioleptic_js_bg.js')|require('./bioleptic_js_bg.cjs')|g" \
             dist/nodejs/bioleptic_js.cjs
 
-          cp bioleptic-js/README.md dist/README.md
+          cp README.md dist/README.md
 
-          # Stamp version from Cargo.toml into the repo's package.json
-          # and write it to dist/ — no need to regenerate it every run.
           sed "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" \
-            bioleptic-js/package.json > dist/package.json
+            package.json > dist/package.json
 
           # Strip devDependencies — they don't belong in the published package
           jq 'del(.devDependencies)' dist/package.json \

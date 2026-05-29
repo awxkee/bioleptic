@@ -10,7 +10,7 @@ env:
   RUST_BACKTRACE: 1
 
 permissions:
-  id-token: write  # Required for OIDC
+  id-token: write
   contents: read
 
 jobs:
@@ -64,6 +64,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
+
     steps:
       - uses: actions/checkout@v4
 
@@ -79,7 +80,7 @@ jobs:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
 
-      - name: Connect
+      - name: Install dependencies
         working-directory: bioleptic-js
         run: npm install && npm ci
 
@@ -101,6 +102,41 @@ jobs:
             fi
           done
 
-      - name: Publish nodejs package
-        if: ${{ !inputs.dry_run }}
-        run: npm publish bioleptic-js/pkg/nodejs/ --access public
+      - name: Assemble dist/
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+
+          mkdir -p dist/bundler dist/web dist/nodejs
+
+          # Copy build outputs, excluding per-build package.json and .gitignore
+          rsync -a --exclude='package.json' --exclude='.gitignore' \
+            bioleptic-js/pkg/bundler/ dist/bundler/
+          rsync -a --exclude='package.json' --exclude='.gitignore' \
+            bioleptic-js/pkg/web/ dist/web/
+          rsync -a --exclude='package.json' --exclude='.gitignore' \
+            bioleptic-js/pkg/nodejs/ dist/nodejs/
+
+          # wasm-pack nodejs target emits CJS files with .js extensions.
+          # Under "type":"module" Node refuses to load .js files with require(),
+          # so rename both the main file and the background glue to .cjs and
+          # fix the internal require() reference between them.
+          mv dist/nodejs/bioleptic_js.js    dist/nodejs/bioleptic_js.cjs
+          mv dist/nodejs/bioleptic_js_bg.js dist/nodejs/bioleptic_js_bg.cjs
+          sed -i "s|require('./bioleptic_js_bg.js')|require('./bioleptic_js_bg.cjs')|g" \
+            dist/nodejs/bioleptic_js.cjs
+
+          cp bioleptic-js/README.md dist/README.md
+
+          # Stamp version from Cargo.toml into the repo's package.json
+          # and write it to dist/ — no need to regenerate it every run.
+          sed "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" \
+            bioleptic-js/package.json > dist/package.json
+
+          # Strip devDependencies — they don't belong in the published package
+          jq 'del(.devDependencies)' dist/package.json \
+            > dist/package.tmp && mv dist/package.tmp dist/package.json
+
+      - name: Publish dist/
+        run: npm publish dist/ --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

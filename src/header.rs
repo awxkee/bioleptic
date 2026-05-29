@@ -102,6 +102,29 @@ pub const BIOLEPTIC_VERSION: u16 = u16::from_le_bytes([1, 0]);
 /// Fixed size of the header in bytes.
 pub const BIOLEPTIC_HEADER_SIZE: usize = size_of::<BiolepticHeader>();
 
+#[derive(Debug, Copy, Clone, PartialOrd, PartialEq, Hash)]
+pub enum EntropyCoder {
+    Deflate = 0,
+    Arans = 1,
+}
+
+impl TryFrom<u8> for EntropyCoder {
+    type Error = BiolepticError;
+    fn try_from(value: u8) -> Result<Self, BiolepticError> {
+        match value {
+            0 => Ok(EntropyCoder::Deflate),
+            1 => Ok(EntropyCoder::Arans),
+            _ => Err(BiolepticError::InvalidEntropyCoder(value)),
+        }
+    }
+}
+
+impl From<EntropyCoder> for u8 {
+    fn from(val: EntropyCoder) -> Self {
+        val as u8
+    }
+}
+
 #[repr(C, packed)]
 pub struct BiolepticHeader {
     /// Magic bytes identifying the format: `b"BILP"`.
@@ -117,8 +140,11 @@ pub struct BiolepticHeader {
     /// Quantization scale factor — DWT coefficients are multiplied by `1 << scale`
     /// before being cast to `i16`.
     pub scale: u8,
+    /// Entropy coder used for the payload (see [`EntropyCoder`]). Previously the
+    /// first byte of `reserved0`; readers must validate it.
+    pub entropy_coder: u8,
     /// Reserved for future use — must be zero.
-    pub reserved0: [u8; 2],
+    pub reserved0: [u8; 1],
     /// Number of samples in the original signal before compression.
     pub signal_length: u32,
     /// Minimum value of the signal after non-finite substitution, stored as `f32` bits
@@ -154,6 +180,7 @@ impl BiolepticHeader {
         max: f32,
         mean: f32,
         compressed_size: u32,
+        entropy_coder: EntropyCoder,
     ) -> Self {
         let compression_method_impl: u32 = compression_method.into();
         Self {
@@ -163,7 +190,8 @@ impl BiolepticHeader {
             compression_method: compression_method_impl.to_le_bytes(),
             levels,
             scale: scale.as_u8(),
-            reserved0: [0; 2],
+            entropy_coder: entropy_coder.into(),
+            reserved0: [0; 1],
             signal_length,
             min: min.to_bits(),
             max: max.to_bits(),
@@ -182,7 +210,8 @@ impl BiolepticHeader {
         buf[8..12].copy_from_slice(&self.compression_method);
         buf[12] = self.levels;
         buf[13] = self.scale;
-        buf[14..16].copy_from_slice(&self.reserved0); // reserved0
+        buf[14] = self.entropy_coder;
+        buf[15] = self.reserved0[0];
         buf[16..20].copy_from_slice(&self.signal_length.to_le_bytes());
         buf[20..24].copy_from_slice(&self.min.to_le_bytes());
         buf[24..28].copy_from_slice(&self.max.to_le_bytes());
@@ -217,6 +246,7 @@ impl BiolepticHeader {
         let v_data_type = DataType::try_from(data_type)?;
         let _ = CompressionMethod::try_from(compression_method)?;
         let _ = QuantizationScale::try_from(buf[13]);
+        let _ = EntropyCoder::try_from(buf[14])?;
 
         let f_min = u32::from_le_bytes(buf[20..24].try_into().unwrap());
         let f_max = u32::from_le_bytes(buf[24..28].try_into().unwrap());
@@ -243,7 +273,8 @@ impl BiolepticHeader {
             compression_method: buf[8..12].try_into().unwrap(),
             levels: buf[12],
             scale: buf[13],
-            reserved0: buf[14..16].try_into().unwrap(),
+            entropy_coder: buf[14],
+            reserved0: buf[15..16].try_into().unwrap(),
             signal_length: u32::from_le_bytes(buf[16..20].try_into().unwrap()),
             min: f_min,
             max: f_max,

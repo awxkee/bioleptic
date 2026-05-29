@@ -20,3 +20,10 @@ path = "decoder/decoder.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "arans"
+path = "arans/arans.rs"
+test = false
+doc = false
+bench = false

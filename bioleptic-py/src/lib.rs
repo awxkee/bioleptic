@@ -28,9 +28,10 @@
  */
 
 use ::bioleptic::{
-    CompressionMethod, CompressionOptions, CutoffLevel, QuantizationScale, compress, decompress,
+    CompressionMethod, CompressionOptions, CutoffLevel, EntropyCoder, QuantizationScale, compress,
+    decompress,
 };
-use numpy::{IntoPyArray, Ix1, PyArray, PyReadonlyArray1};
+use numpy::{IntoPyArray, Ix1, PyArray, PyArray1, PyArrayMethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
@@ -43,9 +44,15 @@ pub struct BiolpCompressionOptions {
 
 #[pymethods]
 impl BiolpCompressionOptions {
+    /// Build options from string-y Python arguments.
+    ///
+    /// * `method` — wavelet transform: `"cdf97"`, `"cdf53"`, `"db4"`, `"sym4"`.
+    /// * `scale`  — quantization shift (DWT coeffs scaled by `1 << scale`); 6..=12.
+    /// * `cutoff` — detail-threshold aggressiveness: `"low"`, `"medium"`, `"high"`.
+    /// * `coder`  — payload entropy coder: `"deflate"`, `"arans"`, `"auto"`.
     #[new]
-    #[pyo3(signature = (method = "cdf97", scale = 11, cutoff = "low"))]
-    fn new(method: &str, scale: u8, cutoff: &str) -> PyResult<Self> {
+    #[pyo3(signature = (method = "cdf97", scale = 11, cutoff = "low", coder = None))]
+    fn new(method: &str, scale: u8, cutoff: &str, coder: Option<&str>) -> PyResult<Self> {
         let method = match method {
             "cdf97" => CompressionMethod::Cdf97,
             "cdf53" => CompressionMethod::Cdf53,
@@ -67,29 +74,59 @@ impl BiolpCompressionOptions {
                 )));
             }
         };
+
         let scale =
             QuantizationScale::try_from(scale).map_err(|e| PyValueError::new_err(e.to_string()))?;
+
+        let entropy_coder: Option<EntropyCoder> = match coder {
+            None | Some("auto") => None,
+            Some("deflate") => Some(EntropyCoder::Deflate),
+            Some("arans") => Some(EntropyCoder::Arans),
+            Some(other) => {
+                return Err(PyValueError::new_err(format!(
+                    "Unknown coder {other:?}, expected 'auto', 'deflate', 'arans'"
+                )));
+            }
+        };
+
         Ok(Self {
             inner: CompressionOptions {
                 method,
                 scale,
+                entropy_coder,
                 cutoff_level: cutoff,
             },
         })
     }
 }
 
-/// Compress a 1-D float32 NumPy array into a Bioleptic-encoded bytes object.
+/// Compress a 1-D float32 **or** float64 NumPy array into Bioleptic `bytes`.
+///
+/// float64 input is downcast to float32 before compression (the codec works in
+/// f32 internally and always reconstructs f32 on decompress).
 #[pyfunction]
 #[pyo3(signature = (data, options = None))]
 fn compress_signal<'py>(
     py: Python<'py>,
-    data: PyReadonlyArray1<'py, f32>,
+    data: &Bound<'py, PyAny>,
     options: Option<BiolpCompressionOptions>,
 ) -> PyResult<Bound<'py, PyBytes>> {
     let opts = options.map(|o| o.inner).unwrap_or_default();
-    let slice = data.as_slice()?;
-    let bytes = compress(slice, opts).map_err(|e| PyValueError::new_err(e.to_string()))?;
+
+    let result = if let Ok(arr) = data.cast::<PyArray1<f32>>() {
+        let ro = arr.readonly();
+        compress(ro.as_slice()?, opts)
+    } else if let Ok(arr) = data.cast::<PyArray1<f64>>() {
+        let ro = arr.readonly();
+        let buf: Vec<f32> = ro.as_slice()?.iter().map(|&x| x as f32).collect::<Vec<_>>();
+        compress(&buf, opts)
+    } else {
+        return Err(PyValueError::new_err(
+            "expected a 1-D float32 or float64 NumPy array",
+        ));
+    };
+
+    let bytes = result.map_err(|e| PyValueError::new_err(e.to_string()))?;
     Ok(PyBytes::new(py, &bytes))
 }
 

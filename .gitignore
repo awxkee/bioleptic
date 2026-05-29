@@ -7,3 +7,4 @@ bioleptic-py/.venv
 bioleptic-python/bioleptic/*.so
 bioleptic-js/target
 bioleptic-js/.npmrc
+assets/

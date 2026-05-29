@@ -26,6 +26,7 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+mod arans;
 mod compressor;
 mod decompressor;
 mod error;
@@ -37,5 +38,5 @@ pub use decompressor::decompress;
 pub use error::BiolepticError;
 pub use header::{
     BIOLEPTIC_HEADER_SIZE, BIOLEPTIC_MAGIC, BIOLEPTIC_VERSION, BiolepticHeader, CompressionMethod,
-    DataType,
+    DataType, EntropyCoder,
 };

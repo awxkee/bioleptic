@@ -84,7 +84,7 @@ jobs:
 
   fuzz_arm:
     name: Fuzzing ARM
-    runs-on: macos-latest
+    runs-on: ubuntu-24.04-arm
     strategy:
       matrix:
         feature: [ "" ]
@@ -105,3 +105,4 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
       - run: cargo install cargo-fuzz
       - run: cargo fuzz run decoder --no-default-features --features "${{ matrix.feature }}" -- -max_total_time=12 -max_len=16128
+      - run: cargo fuzz run arans --no-default-features --features "${{ matrix.feature }}" -- -max_total_time=12 -max_len=16128

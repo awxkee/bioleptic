@@ -26,8 +26,9 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+use crate::header::EntropyCoder;
 use crate::mla::fmla;
-use crate::{BIOLEPTIC_HEADER_SIZE, BiolepticError, BiolepticHeader, CompressionMethod};
+use crate::{BIOLEPTIC_HEADER_SIZE, BiolepticError, BiolepticHeader, CompressionMethod, arans};
 use flate2::read::DeflateDecoder;
 use osclet::{BorderMode, DaubechiesFamily, DwtSize, MultiLevelDwtRef, Osclet, SymletFamily};
 use std::io::Read;
@@ -68,6 +69,8 @@ pub fn decompress(bytes: &[u8]) -> Result<Vec<f32>, BiolepticError> {
 
     let compression_method = header.compression_method()?;
 
+    let entropy_coder = EntropyCoder::try_from(header.entropy_coder)?;
+
     let dwt_worker = match compression_method {
         CompressionMethod::Cdf53 => Osclet::make_cdf53_f32(),
         CompressionMethod::Cdf97 => Osclet::make_cdf97_f32(),
@@ -98,14 +101,28 @@ pub fn decompress(bytes: &[u8]) -> Result<Vec<f32>, BiolepticError> {
 
     let compressed_data = &bytes[BIOLEPTIC_HEADER_SIZE..BIOLEPTIC_HEADER_SIZE + compressed_size];
 
-    let mut decoder = DeflateDecoder::new(compressed_data);
-    let mut decoded_data = vec![0u8; decoder.total_out() as usize];
-    decoder
-        .read_to_end(&mut decoded_data)
-        .map_err(|x| BiolepticError::DecompressionError(x.to_string()))?;
+    let decoded_data = match entropy_coder {
+        EntropyCoder::Deflate => {
+            let mut decoder = DeflateDecoder::new(compressed_data);
+            let mut decoded_data = Vec::new();
+            let total_out = decoder.total_out() as usize;
+            decoded_data
+                .try_reserve_exact(total_out)
+                .map_err(|_| BiolepticError::OutOfMemoryError(total_out))?;
+            decoded_data.resize(total_out, 0);
+            decoder
+                .read_to_end(&mut decoded_data)
+                .map_err(|x| BiolepticError::DecompressionError(x.to_string()))?;
+            decoded_data
+        }
+        EntropyCoder::Arans => arans::decode_stream(compressed_data)
+            .map_err(|x| BiolepticError::DecompressionError(x.to_string()))?,
+    };
 
     let quantized_data = decoded_data
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|x| i16::from_le_bytes([x[0], x[1]]))
         .collect::<Vec<i16>>();
 

@@ -1,9 +1,7 @@
 {
   "name": "bioleptic",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Wavelet-based signal compression",
-  "main": "pkg/bioleptic.js",
-  "types": "pkg/bioleptic.d.ts",
   "license": "(BSD-3-Clause OR Apache-2.0)",
   "repository": {
     "type": "git",
@@ -17,12 +15,42 @@
     "compression",
     "ppg",
     "ecg",
-    "dsp"
+    "dsp",
+    "wasm",
+    "wavelet"
   ],
   "homepage": "https://github.com/awxkee/bioleptic",
+  "type": "module",
+  "main":    "./nodejs/bioleptic_js.cjs",
+  "module":  "./bundler/bioleptic_js.js",
+  "browser": "./web/bioleptic_js.js",
+  "types":   "./bundler/bioleptic_js.d.ts",
+  "exports": {
+    ".": {
+      "node": {
+        "require": "./nodejs/bioleptic_js.cjs",
+        "import":  "./nodejs/bioleptic_js.js"
+      },
+      "browser": {
+        "import": "./web/bioleptic_js.js"
+      },
+      "default": {
+        "import": "./bundler/bioleptic_js.js"
+      }
+    }
+  },
+  "files": [
+    "bundler/",
+    "web/",
+    "nodejs/",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "engines": { "node": ">=18" },
+  "publishConfig": { "access": "public" },
   "scripts": {
-    "build": "wasm-pack build --target bundler --release",
-    "build:node": "wasm-pack build --target nodejs --release",
-    "build:web": "wasm-pack build --target web --release"
+    "build":       "wasm-pack build --target bundler --release",
+    "build:node":  "wasm-pack build --target nodejs  --release",
+    "build:web":   "wasm-pack build --target web     --release"
   }
 }

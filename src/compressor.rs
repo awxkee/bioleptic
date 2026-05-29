@@ -26,7 +26,8 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::{BiolepticError, BiolepticHeader, CompressionMethod, DataType};
+use crate::header::EntropyCoder;
+use crate::{BiolepticError, BiolepticHeader, CompressionMethod, DataType, arans};
 use flate2::Compression;
 use flate2::write::DeflateEncoder;
 use osclet::{BorderMode, DaubechiesFamily, Osclet, SymletFamily};
@@ -88,6 +89,7 @@ pub struct CompressionOptions {
     pub method: CompressionMethod,
     pub scale: QuantizationScale,
     pub cutoff_level: CutoffLevel,
+    pub entropy_coder: Option<EntropyCoder>,
 }
 
 impl Default for CompressionOptions {
@@ -96,6 +98,7 @@ impl Default for CompressionOptions {
             method: CompressionMethod::Cdf97,
             scale: QuantizationScale::S11,
             cutoff_level: CutoffLevel::default(),
+            entropy_coder: None,
         }
     }
 }
@@ -106,6 +109,41 @@ impl CompressionOptions {
             method,
             ..Default::default()
         }
+    }
+
+    /// Sets the wavelet transform.
+    #[must_use]
+    pub fn with_method(mut self, method: CompressionMethod) -> Self {
+        self.method = method;
+        self
+    }
+
+    /// Sets the quantization scale.
+    #[must_use]
+    pub fn with_scale(mut self, scale: QuantizationScale) -> Self {
+        self.scale = scale;
+        self
+    }
+
+    /// Sets the detail-coefficient cutoff level.
+    #[must_use]
+    pub fn with_cutoff_level(mut self, cutoff_level: CutoffLevel) -> Self {
+        self.cutoff_level = cutoff_level;
+        self
+    }
+
+    /// Pins the payload entropy coder to a specific choice.
+    #[must_use]
+    pub fn with_entropy_coder(mut self, entropy_coder: EntropyCoder) -> Self {
+        self.entropy_coder = Some(entropy_coder);
+        self
+    }
+
+    /// Lets the compressor pick the entropy coder automatically (the default).
+    #[must_use]
+    pub fn with_auto_entropy_coder(mut self) -> Self {
+        self.entropy_coder = None;
+        self
     }
 }
 
@@ -301,12 +339,18 @@ pub fn compress(data: &[f32], options: CompressionOptions) -> Result<Vec<u8>, Bi
         .flat_map(|x| x.to_le_bytes())
         .collect::<Vec<_>>();
 
-    let mut e = DeflateEncoder::new(Vec::new(), Compression::default());
-    e.write_all(&approximation_bytes)
-        .map_err(|x| BiolepticError::UnderlyingCompressorError(x.to_string()))?;
-    let compressed_data = e
-        .finish()
-        .map_err(|x| BiolepticError::UnderlyingCompressorError(x.to_string()))?;
+    let entropy_coder = options.entropy_coder.unwrap_or(EntropyCoder::Arans);
+
+    let compressed_data = match entropy_coder {
+        EntropyCoder::Deflate => {
+            let mut e = DeflateEncoder::new(Vec::new(), Compression::default());
+            e.write_all(&approximation_bytes)
+                .map_err(|x| BiolepticError::UnderlyingCompressorError(x.to_string()))?;
+            e.finish()
+                .map_err(|x| BiolepticError::UnderlyingCompressorError(x.to_string()))?
+        }
+        EntropyCoder::Arans => arans::encode_stream(&approximation_bytes),
+    };
 
     let header = BiolepticHeader::new(
         DataType::Float32,
@@ -318,6 +362,7 @@ pub fn compress(data: &[f32], options: CompressionOptions) -> Result<Vec<u8>, Bi
         v_max,
         v_mean,
         compressed_data.len() as u32,
+        entropy_coder,
     );
 
     let mut header_bytes = header.to_bytes().to_vec();
@@ -411,39 +456,190 @@ mod tests {
     #[test]
     fn test_coding() {
         let r_means = generate_ppg(500000, 120., 90.);
-        //35245
-        let raw_bytes = r_means.len() * size_of::<f32>();
-        let encoded = compress(
-            &r_means,
-            CompressionOptions::from_method(CompressionMethod::Cdf97),
-        )
-        .unwrap();
-        let compressed_bytes = encoded.len();
-        let decompressed = decompress(&encoded).unwrap();
-        let cr = raw_bytes as f32 / compressed_bytes as f32;
-        let prd_val = prd(&r_means, &decompressed);
-        assert!(prd_val < 0.5, "got PRD {prd_val}");
-        println!(
-            "n={:5}  raw={:8}  compressed={:8}  cr={:6.2}:1  PRD={:.4}%",
-            r_means.len(),
-            raw_bytes,
-            compressed_bytes,
-            cr,
-            prd_val
-        );
+        for coder in [EntropyCoder::Deflate, EntropyCoder::Arans] {
+            let raw_bytes = r_means.len() * size_of::<f32>();
+
+            let encoded = compress(
+                &r_means,
+                CompressionOptions::from_method(CompressionMethod::Cdf97).with_entropy_coder(coder),
+            )
+            .unwrap();
+            let compressed_bytes = encoded.len();
+            let decompressed = decompress(&encoded).unwrap();
+            let cr = raw_bytes as f32 / compressed_bytes as f32;
+            let prd_val = prd(&r_means, &decompressed);
+            assert!(prd_val < 0.5, "got PRD {prd_val}");
+            println!(
+                "n={:5}  raw={:8}  compressed={:8}  cr={:6.2}:1  PRD={:.4}%",
+                r_means.len(),
+                raw_bytes,
+                compressed_bytes,
+                cr,
+                prd_val
+            );
+        }
     }
 
     #[test]
     fn test_coding_small() {
-        let r_means = [1., 2., 3., 4., 5., 6.];
-        let encoded = compress(
-            &r_means,
-            CompressionOptions::from_method(CompressionMethod::Cdf53),
-        )
-        .unwrap();
-        println!("{:?}", encoded.len());
-        let decompressed = decompress(&encoded).unwrap();
-        println!("{:?}", decompressed.len());
-        assert_eq!(decompressed.len(), r_means.len());
+        for coder in [EntropyCoder::Deflate, EntropyCoder::Arans] {
+            let r_means = [1., 2., 3., 4., 5., 6.];
+            let raw_bytes = r_means.len() * size_of::<f32>();
+            let encoded = compress(
+                &r_means,
+                CompressionOptions::from_method(CompressionMethod::Cdf53).with_entropy_coder(coder),
+            )
+            .unwrap();
+            let compressed_bytes = encoded.len();
+            let decompressed = decompress(&encoded).unwrap();
+            assert_eq!(decompressed.len(), r_means.len());
+            let cr = raw_bytes as f32 / compressed_bytes as f32;
+            let prd_val = prd(&r_means, &decompressed);
+            assert!(prd_val < 0.5, "got PRD {prd_val}");
+            println!(
+                "n={:5}  raw={:8}  compressed={:8}  cr={:6.2}:1  PRD={:.4}%",
+                r_means.len(),
+                raw_bytes,
+                compressed_bytes,
+                cr,
+                prd_val
+            );
+        }
     }
+
+    // #[derive(Clone, Copy, Debug)]
+    // enum SampleFmt {
+    //     I16le,
+    //     F32le,
+    // }
+    //
+    // /// Load one channel of a raw (headerless) `.bin` as `f32`.
+    // ///
+    // /// * `channels` — interleave factor (1 = single lead, 2 = MIT-BIH, 12 = PTB-XL…)
+    // /// * `channel`  — which 0-based channel to extract
+    // /// * `skip`     — header bytes to drop before the samples (0 for raw dumps)
+    // fn load_channel(
+    //     path: &str,
+    //     fmt: SampleFmt,
+    //     channels: usize,
+    //     channel: usize,
+    //     skip: usize,
+    // ) -> io::Result<Vec<f32>> {
+    //     let raw = fs::read(path)?;
+    //     let body = &raw[skip.min(raw.len())..];
+    //
+    //     let all: Vec<f32> = match fmt {
+    //         SampleFmt::I16le => body
+    //             .chunks_exact(2)
+    //             .map(|b| i16::from_le_bytes([b[0], b[1]]) as f32)
+    //             .collect(),
+    //         SampleFmt::F32le => body
+    //             .chunks_exact(4)
+    //             .map(|b| f32::from_le_bytes([b[0], b[1], b[2], b[3]]))
+    //             .collect(),
+    //     };
+    //
+    //     // De-interleave: keep every `channels`-th sample starting at `channel`.
+    //     Ok(all
+    //         .into_iter()
+    //         .skip(channel)
+    //         .step_by(channels.max(1))
+    //         .collect())
+    // }
+    //
+    // /// When you don't know the format, print the first few samples under each
+    // /// interpretation. ECG ADC values are typically small signed ints (|v| < ~5000);
+    // /// f32 dumps look like sane physical magnitudes. The size hints also help:
+    // /// a file divisible by 4 *might* be f32; one only divisible by 2 is i16.
+    // fn sniff(path: &str) -> io::Result<()> {
+    //     let raw = fs::read(path)?;
+    //     println!(
+    //         "file: {} bytes  (÷2={}, ÷4={})",
+    //         raw.len(),
+    //         raw.len() % 2 == 0,
+    //         raw.len() % 4 == 0
+    //     );
+    //     let as_i16: Vec<i16> = raw
+    //         .chunks_exact(2)
+    //         .take(8)
+    //         .map(|b| i16::from_le_bytes([b[0], b[1]]))
+    //         .collect();
+    //     let as_f32: Vec<f32> = raw
+    //         .chunks_exact(4)
+    //         .take(8)
+    //         .map(|b| f32::from_le_bytes([b[0], b[1], b[2], b[3]]))
+    //         .collect();
+    //     println!("  as i16le: {:?}", as_i16);
+    //     println!("  as f32le: {:?}", as_f32);
+    //     Ok(())
+    // }
+    //
+    // /// Compress one window and report ratio + distortion.
+    // fn test_window(seg: &[f32], opts: CompressionOptions) {
+    //     let raw_bytes = seg.len() * std::mem::size_of::<f32>();
+    //     let encoded = compress(seg, opts).expect("compress");
+    //     let decoded = decompress(&encoded).expect("decompress");
+    //     let cr = raw_bytes as f32 / encoded.len() as f32;
+    //     println!(
+    //         "  n={:6}  raw={:8}  comp={:7}  CR={:6.2}:1  PRD={:.3}%",
+    //         seg.len(),
+    //         raw_bytes,
+    //         encoded.len(),
+    //         cr,
+    //         prd(seg, &decoded)
+    //     );
+    // }
+    //
+    // /// Sweep the whole signal in fixed blocks and report the aggregate — a far more
+    // /// honest figure than a single hand-picked window, since CR and PRD both depend
+    // /// on block size (smaller blocks pay more fixed header per block).
+    // fn sweep_blocks(sig: &[f32], block: usize, opts: CompressionOptions) {
+    //     let (mut raw_total, mut comp_total, mut prd_sum, mut nblocks) =
+    //         (0usize, 0usize, 0f64, 0usize);
+    //     for chunk in sig.chunks(block) {
+    //         if chunk.len() < 16 {
+    //             continue;
+    //         } // skip a tiny tail block
+    //         let encoded = compress(chunk, opts).expect("compress");
+    //         let decoded = decompress(&encoded).expect("decompress");
+    //         raw_total += chunk.len() * 4;
+    //         comp_total += encoded.len();
+    //         prd_sum += prd(chunk, &decoded);
+    //         nblocks += 1;
+    //     }
+    //     println!(
+    //         "  block={:5}: {} blocks  CR={:.2}:1  meanPRD={:.3}%",
+    //         block,
+    //         nblocks,
+    //         raw_total as f32 / comp_total as f32,
+    //         prd_sum / nblocks as f64
+    //     );
+    // }
+    //
+    // #[test]
+    // fn test_coding2() {
+    //     sniff("./assets/ecg_aVR.bin").unwrap();
+    //     let r_means = load_channel("./assets/ecg_aVR.bin", SampleFmt::I16le, 2, 1, 0).unwrap();
+    //
+    //     let raw_bytes = r_means.len() * size_of::<f32>();
+    //
+    //     let encoded = compress(
+    //         &r_means,
+    //         CompressionOptions::from_method(CompressionMethod::Cdf97).with_entropy_coder(EntropyCoder::Deflate),
+    //     )
+    //     .unwrap();
+    //     let compressed_bytes = encoded.len();
+    //     // let decompressed = decompress(&encoded).unwrap();
+    //     let cr = raw_bytes as f32 / compressed_bytes as f32;
+    //     // let prd_val = prd(&r_means, &decompressed);
+    //     // assert!(prd_val < 0.5, "got PRD {prd_val}");
+    //     println!(
+    //         "n={:5}  raw={:8}  compressed={:8}  cr={:6.2}:1  PRD={:.4}%",
+    //         r_means.len(),
+    //         raw_bytes,
+    //         compressed_bytes,
+    //         cr,
+    //         0.
+    //     );
+    // }
 }

@@ -41,6 +41,7 @@ pub enum BiolepticError {
     UnsupportedCompressorConfiguration(String),
     DecompressionError(String),
     InvalidQuantizationScale(u8),
+    InvalidEntropyCoder(u8),
 }
 
 impl Display for BiolepticError {
@@ -79,6 +80,9 @@ impl Display for BiolepticError {
             BiolepticError::InvalidQuantizationScale(s) => f.write_fmt(format_args!(
                 "Only scaled 6..12 is supported, but it was {s}"
             )),
+            BiolepticError::InvalidEntropyCoder(e) => {
+                f.write_fmt(format_args!("Unknown entropy coder {e}"))
+            }
         }
     }
 }

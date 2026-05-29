@@ -1,6 +1,6 @@
 [package]
 name = "bioleptic-py"
-version = "0.1.2"
+version = "0.2.0"
 edition = "2024"
 description = "Biosignals compression"
 readme = "README.md"
@@ -13,7 +13,7 @@ homepage = "https://github.com/awxkee/bioleptic"
 repository = "https://github.com/awxkee/bioleptic"
 exclude = ["*.jpg", "/assets", "*.png", "*.sh", "/assets/*"]
 include = ["/src/", "/README.md", "/LICENSE.md", "/LICENSE-APACHE.md"]
-rust-version = "1.88.0"
+rust-version = "1.89.0"
 
 [dependencies]
 bioleptic = { path = "../" }

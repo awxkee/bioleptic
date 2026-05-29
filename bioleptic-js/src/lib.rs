@@ -27,13 +27,21 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use bioleptic::{
-    CompressionMethod, CompressionOptions, CutoffLevel, QuantizationScale, compress, decompress,
+    CompressionMethod, CompressionOptions, CutoffLevel, EntropyCoder, QuantizationScale, compress,
+    decompress,
 };
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
 pub struct BiolpCompressionOptions {
     inner: CompressionOptions,
+}
+
+#[wasm_bindgen]
+#[derive(Copy, Clone)]
+pub enum BiolpEntropyCoder {
+    Deflate,
+    Arans,
 }
 
 #[wasm_bindgen]
@@ -86,6 +94,7 @@ impl BiolpCompressionOptions {
         method: BiolpCompressionMethod,
         scale: BiolpQuantizationScale,
         cutoff: BiolpCutoffLevel,
+        entropy_coder: Option<BiolpEntropyCoder>,
     ) -> Result<BiolpCompressionOptions, JsError> {
         let method = match method {
             BiolpCompressionMethod::Cdf97 => CompressionMethod::Cdf97,
@@ -99,9 +108,14 @@ impl BiolpCompressionOptions {
             BiolpCutoffLevel::High => CutoffLevel::High,
         };
         let scale = QuantizationScale::from(scale);
+        let coder = match entropy_coder.unwrap_or(BiolpEntropyCoder::Arans) {
+            BiolpEntropyCoder::Deflate => EntropyCoder::Deflate,
+            BiolpEntropyCoder::Arans => EntropyCoder::Arans,
+        };
         Ok(Self {
             inner: CompressionOptions {
                 method,
+                entropy_coder: Some(coder),
                 scale,
                 cutoff_level: cutoff,
             },

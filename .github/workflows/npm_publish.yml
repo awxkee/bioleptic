@@ -58,7 +58,7 @@ jobs:
 
   publish:
     name: Publish to npm
-    needs: [build]
+    needs: [ build ]
     runs-on: ubuntu-latest
     environment: Cargo
     permissions:
@@ -136,6 +136,6 @@ jobs:
             > dist/package.tmp && mv dist/package.tmp dist/package.json
 
       - name: Publish dist/
-        run: npm publish dist/ --provenance --access public
+        run: npm install && npm ci && npm publish dist/ --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

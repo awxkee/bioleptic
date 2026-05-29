@@ -1,6 +1,6 @@
 {
   "name": "bioleptic-js",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Wavelet-based signal compression",
   "license": "(BSD-3-Clause OR Apache-2.0)",
   "repository": {

@@ -1,6 +1,6 @@
 [package]
 name = "bioleptic-py"
-version = "0.2.2"
+version = "0.2.3"
 edition = "2024"
 description = "Biosignals compression"
 readme = "README.md"

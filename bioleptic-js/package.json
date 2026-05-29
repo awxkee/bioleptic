@@ -1,6 +1,6 @@
 {
   "name": "bioleptic-js",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Wavelet-based signal compression",
   "license": "(BSD-3-Clause OR Apache-2.0)",
   "repository": {
@@ -24,21 +24,23 @@
   "main": "./nodejs/bioleptic_js.cjs",
   "module": "./bundler/bioleptic_js.js",
   "browser": "./web/bioleptic_js.js",
-  "types": "./bundler/bioleptic_js.d.ts",
   "exports": {
     ".": {
       "node": {
-        "require": "./nodejs/bioleptic_js.cjs",
-        "import": "./nodejs/bioleptic_js.js"
+        "types": "./nodejs/bioleptic_js.d.ts",
+        "require": "./nodejs/bioleptic_js.cjs"
       },
       "browser": {
+        "types": "./bundler/bioleptic_js.d.ts",
         "import": "./web/bioleptic_js.js"
       },
       "default": {
+        "types": "./bundler/bioleptic_js.d.ts",
         "import": "./bundler/bioleptic_js.js"
       }
     }
   },
+  "types": "./bundler/bioleptic_js.d.ts",
   "files": [
     "bundler/",
     "web/",

@@ -5,7 +5,7 @@
   "license": "(BSD-3-Clause OR Apache-2.0)",
   "repository": {
     "type": "git",
-    "url": "https://github.com/awxkee/bioleptic"
+    "url": "git+https://github.com/awxkee/bioleptic.git"
   },
   "author": {
     "name": "Radzivon Bartoshyk",
@@ -21,15 +21,15 @@
   ],
   "homepage": "https://github.com/awxkee/bioleptic",
   "type": "module",
-  "main":    "./nodejs/bioleptic_js.cjs",
-  "module":  "./bundler/bioleptic_js.js",
+  "main": "./nodejs/bioleptic_js.cjs",
+  "module": "./bundler/bioleptic_js.js",
   "browser": "./web/bioleptic_js.js",
-  "types":   "./bundler/bioleptic_js.d.ts",
+  "types": "./bundler/bioleptic_js.d.ts",
   "exports": {
     ".": {
       "node": {
         "require": "./nodejs/bioleptic_js.cjs",
-        "import":  "./nodejs/bioleptic_js.js"
+        "import": "./nodejs/bioleptic_js.js"
       },
       "browser": {
         "import": "./web/bioleptic_js.js"
@@ -46,11 +46,15 @@
     "README.md"
   ],
   "sideEffects": false,
-  "engines": { "node": ">=18" },
-  "publishConfig": { "access": "public" },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
-    "build":       "wasm-pack build --target bundler --release",
-    "build:node":  "wasm-pack build --target nodejs  --release",
-    "build:web":   "wasm-pack build --target web     --release"
+    "build": "wasm-pack build --target bundler --release",
+    "build:node": "wasm-pack build --target nodejs  --release",
+    "build:web": "wasm-pack build --target web     --release"
   }
 }

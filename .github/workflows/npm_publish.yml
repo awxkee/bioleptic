@@ -103,6 +103,7 @@ jobs:
           done
 
       - name: Assemble dist/
+        working-directory: bioleptic-js
         run: |
           VERSION="${{ steps.version.outputs.version }}"
 
@@ -136,7 +137,7 @@ jobs:
             > dist/package.tmp && mv dist/package.tmp dist/package.json
 
       - name: Publish dist/
-        working-directory: bioleptic-js
-        run: npm install && npm ci && npm publish dist/ --provenance --access public
+        working-directory: bioleptic-js/dist
+        run: npm install && npm ci && npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

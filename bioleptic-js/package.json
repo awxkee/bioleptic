@@ -1,6 +1,6 @@
 {
   "name": "bioleptic-js",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "description": "Wavelet-based signal compression",
   "license": "(BSD-3-Clause OR Apache-2.0)",
   "repository": {
@@ -56,7 +56,7 @@
   },
   "scripts": {
     "build": "wasm-pack build --target bundler --release",
-    "build:node": "wasm-pack build --target nodejs  --release",
-    "build:web": "wasm-pack build --target web     --release"
+    "build:node": "wasm-pack build --target nodejs --release",
+    "build:web": "wasm-pack build --target web --release"
   }
 }

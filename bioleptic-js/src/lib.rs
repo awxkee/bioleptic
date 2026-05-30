@@ -26,25 +26,31 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 use bioleptic::{
     CompressionMethod, CompressionOptions, CutoffLevel, EntropyCoder, QuantizationScale, compress,
     decompress,
 };
 use wasm_bindgen::prelude::*;
 
-#[wasm_bindgen]
+/// Compression options. Construct with `new CompressionOptions(...)`.
+#[wasm_bindgen(js_name = CompressionOptions)]
 pub struct BiolpCompressionOptions {
     inner: CompressionOptions,
 }
 
-#[wasm_bindgen]
+/// Entropy coder for the payload. `Cmodel` (significance-map + per-subband
+/// magnitude) is the most efficient; omit the argument for `auto`.
+#[wasm_bindgen(js_name = EntropyCoder)]
 #[derive(Copy, Clone)]
 pub enum BiolpEntropyCoder {
     Deflate,
     Arans,
+    Cmodel,
 }
 
-#[wasm_bindgen]
+/// Wavelet transform used for decorrelation.
+#[wasm_bindgen(js_name = CompressionMethod)]
 #[derive(Copy, Clone)]
 pub enum BiolpCompressionMethod {
     Cdf97,
@@ -53,7 +59,8 @@ pub enum BiolpCompressionMethod {
     Db4,
 }
 
-#[wasm_bindgen]
+/// Aggressiveness of the detail-coefficient threshold (dead-zone).
+#[wasm_bindgen(js_name = CutoffLevel)]
 #[derive(Copy, Clone)]
 pub enum BiolpCutoffLevel {
     Low,
@@ -61,7 +68,9 @@ pub enum BiolpCutoffLevel {
     High,
 }
 
-#[wasm_bindgen]
+/// Quantization shift: DWT coefficients are scaled by `1 << scale` when no
+/// explicit `quantMultiplier` is given. Also selects the threshold table.
+#[wasm_bindgen(js_name = QuantizationScale)]
 #[derive(Copy, Clone)]
 pub enum BiolpQuantizationScale {
     S6 = 6,
@@ -87,14 +96,23 @@ impl From<BiolpQuantizationScale> for QuantizationScale {
     }
 }
 
-#[wasm_bindgen]
+#[wasm_bindgen(js_class = CompressionOptions)]
 impl BiolpCompressionOptions {
+    /// Build compression options.
+    ///
+    /// * `method` — wavelet transform.
+    /// * `scale` — quantization shift (used when `quantMultiplier` is absent).
+    /// * `cutoff` — detail-threshold aggressiveness.
+    /// * `entropyCoder` — payload coder; omit / pass `undefined` for `auto`.
+    /// * `quantMultiplier` — explicit coefficient multiplier; overrides `scale`
+    ///   so you can hit a precise PRD target instead of the power-of-two grid.
     #[wasm_bindgen(constructor)]
     pub fn new(
         method: BiolpCompressionMethod,
         scale: BiolpQuantizationScale,
         cutoff: BiolpCutoffLevel,
-        entropy_coder: Option<BiolpEntropyCoder>,
+        #[wasm_bindgen(js_name = entropyCoder)] entropy_coder: Option<BiolpEntropyCoder>,
+        #[wasm_bindgen(js_name = quantMultiplier)] quant_multiplier: Option<f32>,
     ) -> Result<BiolpCompressionOptions, JsError> {
         let method = match method {
             BiolpCompressionMethod::Cdf97 => CompressionMethod::Cdf97,
@@ -108,23 +126,27 @@ impl BiolpCompressionOptions {
             BiolpCutoffLevel::High => CutoffLevel::High,
         };
         let scale = QuantizationScale::from(scale);
-        let coder = match entropy_coder.unwrap_or(BiolpEntropyCoder::Arans) {
-            BiolpEntropyCoder::Deflate => EntropyCoder::Deflate,
-            BiolpEntropyCoder::Arans => EntropyCoder::Arans,
+        // `None` => auto (the crate currently picks Cmodel).
+        let entropy_coder: Option<EntropyCoder> = match entropy_coder {
+            None => None,
+            Some(BiolpEntropyCoder::Deflate) => Some(EntropyCoder::Deflate),
+            Some(BiolpEntropyCoder::Arans) => Some(EntropyCoder::Arans),
+            Some(BiolpEntropyCoder::Cmodel) => Some(EntropyCoder::Cmodel),
         };
         Ok(Self {
             inner: CompressionOptions {
                 method,
-                entropy_coder: Some(coder),
+                entropy_coder,
                 scale,
                 cutoff_level: cutoff,
+                quant_multiplier,
             },
         })
     }
 }
 
-/// Compress a Float32Array into a Uint8Array.
-#[wasm_bindgen]
+/// Compress a `Float32Array` of samples into a Bioleptic `Uint8Array`.
+#[wasm_bindgen(js_name = compressSignal)]
 pub fn compress_signal(
     data: &[f32],
     options: Option<BiolpCompressionOptions>,
@@ -133,8 +155,8 @@ pub fn compress_signal(
     compress(data, opts).map_err(|e| JsError::new(&e.to_string()))
 }
 
-/// Decompress a Uint8Array back into a Float32Array.
-#[wasm_bindgen]
+/// Decompress a Bioleptic `Uint8Array` back into a `Float32Array`.
+#[wasm_bindgen(js_name = decompressSignal)]
 pub fn decompress_signal(data: &[u8]) -> Result<Vec<f32>, JsError> {
     decompress(data).map_err(|e| JsError::new(&e.to_string()))
 }

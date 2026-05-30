@@ -28,22 +28,30 @@
  */
 use crate::header::EntropyCoder;
 use crate::mla::fmla;
-use crate::{BIOLEPTIC_HEADER_SIZE, BiolepticError, BiolepticHeader, CompressionMethod, arans};
+use crate::{
+    BIOLEPTIC_HEADER_SIZE, BiolepticError, BiolepticHeader, CompressionMethod, arans, cmodel,
+};
 use flate2::read::DeflateDecoder;
 use osclet::{BorderMode, DaubechiesFamily, DwtSize, MultiLevelDwtRef, Osclet, SymletFamily};
 use std::io::Read;
 
-/// Decompresses a Bioleptic-encoded byte slice back into `f32` samples.
-///
-/// Reads and validates the header, entropy-decodes the payload with deflate,
-/// dequantizes coefficients, reconstructs the signal via inverse multi-level
-/// DWT, then reverses the mean-centering and range normalization applied
-/// during compression.
-pub fn decompress(bytes: &[u8]) -> Result<Vec<f32>, BiolepticError> {
-    let header = BiolepticHeader::from_bytes(bytes)?;
-
-    let signal_length = header.signal_length as usize;
-
+/// Core decode: entropy-decode + dequantize + inverse DWT + denormalize, given
+/// the shared transform parameters and the per-channel normalization/fidelity
+/// numbers explicitly. Shared by single-channel `decompress` and the
+/// multi-channel container.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn decompress_core(
+    payload: &[u8],
+    compression_method: CompressionMethod,
+    dwt_levels: usize,
+    signal_length: usize,
+    min: f32,
+    max: f32,
+    mean: f32,
+    quant_multiplier: f32,
+    scale: u8,
+    entropy_coder: EntropyCoder,
+) -> Result<Vec<f32>, BiolepticError> {
     if signal_length > i32::MAX as usize {
         return Err(BiolepticError::DecompressionError(format!(
             "Can't decompress data bigger than {}, but data was {}",
@@ -51,8 +59,6 @@ pub fn decompress(bytes: &[u8]) -> Result<Vec<f32>, BiolepticError> {
             signal_length,
         )));
     }
-
-    let dwt_levels = header.levels as usize;
 
     if dwt_levels > 10 {
         return Err(BiolepticError::DecompressionError(format!(
@@ -67,9 +73,11 @@ pub fn decompress(bytes: &[u8]) -> Result<Vec<f32>, BiolepticError> {
         )));
     }
 
-    let compression_method = header.compression_method()?;
-
-    let entropy_coder = EntropyCoder::try_from(header.entropy_coder)?;
+    if !(6..=12).contains(&scale) {
+        return Err(BiolepticError::DecompressionError(format!(
+            "Supported scales only [6, 12] but it was {scale}"
+        )));
+    }
 
     let dwt_worker = match compression_method {
         CompressionMethod::Cdf53 => Osclet::make_cdf53_f32(),
@@ -88,8 +96,101 @@ pub fn decompress(bytes: &[u8]) -> Result<Vec<f32>, BiolepticError> {
         levels_length[i] = level_size;
     }
 
+    let rcp_scale = 1. / quant_multiplier;
+
+    // Entropy-decode the payload into the quantized coefficient stream, laid out
+    // as [approximation, detail0, detail1, ..., detail_{L-1}].
+    let quantized_data: Vec<i16> = match entropy_coder {
+        EntropyCoder::Cmodel => {
+            let mut lengths = Vec::with_capacity(dwt_levels + 1);
+            lengths.push(levels_length[dwt_levels - 1].approx_length);
+            for level in levels_length.iter() {
+                lengths.push(level.details_length);
+            }
+            let subbands = cmodel::decode_coeffs(payload, &lengths)
+                .map_err(|x| BiolepticError::DecompressionError(x.to_string()))?;
+            let total: usize = lengths.iter().sum();
+            let mut q = Vec::with_capacity(total);
+            for sb in subbands {
+                q.extend_from_slice(&sb);
+            }
+            q
+        }
+        EntropyCoder::Deflate | EntropyCoder::Arans => {
+            let decoded_data = match entropy_coder {
+                EntropyCoder::Deflate => {
+                    let mut decoder = DeflateDecoder::new(payload);
+                    let mut decoded_data = Vec::new();
+                    let total_out = decoder.total_out() as usize;
+                    decoded_data
+                        .try_reserve_exact(total_out)
+                        .map_err(|_| BiolepticError::OutOfMemoryError(total_out))?;
+                    decoded_data.resize(total_out, 0);
+                    decoder
+                        .read_to_end(&mut decoded_data)
+                        .map_err(|x| BiolepticError::DecompressionError(x.to_string()))?;
+                    decoded_data
+                }
+                EntropyCoder::Arans => arans::decode_stream(payload)
+                    .map_err(|x| BiolepticError::DecompressionError(x.to_string()))?,
+                EntropyCoder::Cmodel => unreachable!(),
+            };
+            decoded_data
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .map(|x| i16::from_le_bytes([x[0], x[1]]))
+                .collect::<Vec<i16>>()
+        }
+    };
+
+    let approx_length = levels_length[dwt_levels - 1].approx_length;
+
+    let mut details = vec![];
+    let mut details_start = approx_length;
+    for level in 0..dwt_levels {
+        let detail_level: Vec<f32> = quantized_data
+            [details_start..details_start + levels_length[level].details_length]
+            .iter()
+            .map(|&x| x as f32 * rcp_scale)
+            .collect();
+        details.push(detail_level);
+        details_start += levels_length[level].details_length;
+    }
+
+    let approximations: Vec<f32> = quantized_data[..approx_length]
+        .iter()
+        .map(|&x| x as f32 * rcp_scale)
+        .collect();
+
+    let mut iwdt = dwt_worker
+        .multi_idwt(&MultiLevelDwtRef {
+            approximations: &approximations,
+            details: details.iter().map(|x| x.as_slice()).collect(),
+        })
+        .map_err(|x| BiolepticError::UnderlyingDwtError(x.to_string()))?;
+
+    let range = max - min;
+    for v in iwdt.iter_mut() {
+        *v = fmla(*v + mean, range, min);
+    }
+    // DWT might produce a different size for odd-sized data, so truncate/pad.
+    if iwdt.len() != signal_length {
+        iwdt.resize(signal_length, 0.);
+    }
+
+    Ok(iwdt)
+}
+
+/// Decompresses a single-channel Bioleptic-encoded byte slice back into `f32`.
+///
+/// Reads and validates the header, then delegates to [`decompress_core`].
+pub fn decompress(bytes: &[u8]) -> Result<Vec<f32>, BiolepticError> {
+    let header = BiolepticHeader::from_bytes(bytes)?;
+
     let compressed_size = header.compressed_size as usize;
 
+    // `from_bytes` guarantees bytes.len() >= BIOLEPTIC_HEADER_SIZE.
     let data_remainder_size = bytes.len() - BIOLEPTIC_HEADER_SIZE;
     if data_remainder_size < compressed_size {
         return Err(BiolepticError::DecompressionError(format!(
@@ -101,73 +202,16 @@ pub fn decompress(bytes: &[u8]) -> Result<Vec<f32>, BiolepticError> {
 
     let compressed_data = &bytes[BIOLEPTIC_HEADER_SIZE..BIOLEPTIC_HEADER_SIZE + compressed_size];
 
-    let decoded_data = match entropy_coder {
-        EntropyCoder::Deflate => {
-            let mut decoder = DeflateDecoder::new(compressed_data);
-            let mut decoded_data = Vec::new();
-            let total_out = decoder.total_out() as usize;
-            decoded_data
-                .try_reserve_exact(total_out)
-                .map_err(|_| BiolepticError::OutOfMemoryError(total_out))?;
-            decoded_data.resize(total_out, 0);
-            decoder
-                .read_to_end(&mut decoded_data)
-                .map_err(|x| BiolepticError::DecompressionError(x.to_string()))?;
-            decoded_data
-        }
-        EntropyCoder::Arans => arans::decode_stream(compressed_data)
-            .map_err(|x| BiolepticError::DecompressionError(x.to_string()))?,
-    };
-
-    let quantized_data = decoded_data
-        .as_chunks::<2>()
-        .0
-        .iter()
-        .map(|x| i16::from_le_bytes([x[0], x[1]]))
-        .collect::<Vec<i16>>();
-
-    let scale = header.scale;
-    if !(6..=12).contains(&scale) {
-        return Err(BiolepticError::DecompressionError(format!(
-            "Supported scales only [6, 12] but it was {scale}"
-        )));
-    }
-
-    let rcp_scale = 1. / (1 << scale) as f32;
-
-    let mut details = vec![];
-    let mut details_start = levels_length[dwt_levels - 1].approx_length;
-    for level in 0..dwt_levels {
-        let detail_level: Vec<f32> = quantized_data
-            [details_start..details_start + levels_length[level].details_length]
-            .iter()
-            .map(|&x| x as f32 * rcp_scale)
-            .collect();
-        details.push(detail_level);
-        details_start += levels_length[level].details_length;
-    }
-
-    let mut iwdt = dwt_worker
-        .multi_idwt(&MultiLevelDwtRef {
-            approximations: &quantized_data[..levels_length[dwt_levels - 1].approx_length]
-                .iter()
-                .map(|&x| x as f32 * rcp_scale)
-                .collect::<Vec<f32>>(),
-            details: details.iter().map(|x| x.as_slice()).collect(),
-        })
-        .map_err(|x| BiolepticError::UnderlyingDwtError(x.to_string()))?;
-
-    let range = header.max_f32() - header.min_f32();
-    let v_min = header.min_f32();
-    let v_mean = header.mean_f32();
-
-    for v in iwdt.iter_mut() {
-        *v = fmla(*v + v_mean, range, v_min);
-    }
-    // DWT might produce for odd sized data different size, so we'll truncate it
-    if iwdt.len() != header.signal_length as usize {
-        iwdt.resize(header.signal_length as usize, 0.);
-    }
-
-    Ok(iwdt)
+    decompress_core(
+        compressed_data,
+        header.compression_method()?,
+        header.levels as usize,
+        header.signal_length as usize,
+        header.min_f32(),
+        header.max_f32(),
+        header.mean_f32(),
+        header.quant_multiplier(),
+        header.scale,
+        EntropyCoder::try_from(header.entropy_coder)?,
+    )
 }

@@ -36,7 +36,7 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 
-#[pyclass(from_py_object)]
+#[pyclass(from_py_object, name = "CompressionOptions")]
 #[derive(Clone)]
 pub struct BiolpCompressionOptions {
     inner: CompressionOptions,
@@ -49,10 +49,17 @@ impl BiolpCompressionOptions {
     /// * `method` — wavelet transform: `"cdf97"`, `"cdf53"`, `"db4"`, `"sym4"`.
     /// * `scale`  — quantization shift (DWT coeffs scaled by `1 << scale`); 6..=12.
     /// * `cutoff` — detail-threshold aggressiveness: `"low"`, `"medium"`, `"high"`.
-    /// * `coder`  — payload entropy coder: `"deflate"`, `"arans"`, `"auto"`.
+    /// * `coder`  — payload entropy coder: `"deflate"`, `"arans"`, `"cmodel"`, `"auto"`.
+    /// * `quant_multiplier` — explicit coefficient multiplier; overrides `scale`.
     #[new]
-    #[pyo3(signature = (method = "cdf97", scale = 11, cutoff = "low", coder = None))]
-    fn new(method: &str, scale: u8, cutoff: &str, coder: Option<&str>) -> PyResult<Self> {
+    #[pyo3(signature = (method = "cdf97", scale = 11, cutoff = "low", coder = None, quant_multiplier = None))]
+    fn new(
+        method: &str,
+        scale: u8,
+        cutoff: &str,
+        coder: Option<&str>,
+        quant_multiplier: Option<f32>,
+    ) -> PyResult<Self> {
         let method = match method {
             "cdf97" => CompressionMethod::Cdf97,
             "cdf53" => CompressionMethod::Cdf53,
@@ -82,6 +89,7 @@ impl BiolpCompressionOptions {
             None | Some("auto") => None,
             Some("deflate") => Some(EntropyCoder::Deflate),
             Some("arans") => Some(EntropyCoder::Arans),
+            Some("cmodel") => Some(EntropyCoder::Cmodel),
             Some(other) => {
                 return Err(PyValueError::new_err(format!(
                     "Unknown coder {other:?}, expected 'auto', 'deflate', 'arans'"
@@ -95,6 +103,7 @@ impl BiolpCompressionOptions {
                 scale,
                 entropy_coder,
                 cutoff_level: cutoff,
+                quant_multiplier,
             },
         })
     }

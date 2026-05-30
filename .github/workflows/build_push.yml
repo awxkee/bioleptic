@@ -106,3 +106,4 @@ jobs:
       - run: cargo install cargo-fuzz
       - run: cargo fuzz run decoder --no-default-features --features "${{ matrix.feature }}" -- -max_total_time=12 -max_len=16128
       - run: cargo fuzz run arans --no-default-features --features "${{ matrix.feature }}" -- -max_total_time=12 -max_len=16128
+      - run: cargo fuzz run cmodel --no-default-features --features "${{ matrix.feature }}" -- -max_total_time=12 -max_len=16128

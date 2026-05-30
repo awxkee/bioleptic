@@ -27,3 +27,10 @@ path = "arans/arans.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "cmodel"
+path = "cmodel/cmodel.rs"
+test = false
+doc = false
+bench = false

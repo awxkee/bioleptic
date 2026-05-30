@@ -26,17 +26,24 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#![deny(unreachable_pub)]
 mod arans;
+mod cmodel;
 mod compressor;
 mod decompressor;
 mod error;
 mod header;
 mod mla;
+mod multichannel;
 
-pub use compressor::{CompressionOptions, CutoffLevel, QuantizationScale, compress};
+pub use compressor::{
+    CompressionOptions, CutoffLevel, QuantizationScale, compress, compress_multi, compress_to_prd,
+    decompress_multi,
+};
 pub use decompressor::decompress;
 pub use error::BiolepticError;
 pub use header::{
     BIOLEPTIC_HEADER_SIZE, BIOLEPTIC_MAGIC, BIOLEPTIC_VERSION, BiolepticHeader, CompressionMethod,
     DataType, EntropyCoder, FORMAT_MAJOR, FORMAT_MINOR,
 };
+pub use multichannel::{BILX_MAGIC, BILX_MAJOR, BILX_MINOR, BILX_VERSION};

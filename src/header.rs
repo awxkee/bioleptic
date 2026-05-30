@@ -97,7 +97,7 @@ impl From<DataType> for u16 {
 pub const BIOLEPTIC_MAGIC: [u8; 4] = *b"BILP";
 
 pub const FORMAT_MAJOR: u8 = 1;
-pub const FORMAT_MINOR: u8 = 1;
+pub const FORMAT_MINOR: u8 = 2;
 /// Current format version.
 pub const BIOLEPTIC_VERSION: u16 = u16::from_le_bytes([FORMAT_MAJOR, FORMAT_MINOR]);
 
@@ -108,6 +108,7 @@ pub const BIOLEPTIC_HEADER_SIZE: usize = size_of::<BiolepticHeader>();
 pub enum EntropyCoder {
     Deflate = 0,
     Arans = 1,
+    Cmodel = 2,
 }
 
 impl TryFrom<u8> for EntropyCoder {
@@ -116,6 +117,7 @@ impl TryFrom<u8> for EntropyCoder {
         match value {
             0 => Ok(EntropyCoder::Deflate),
             1 => Ok(EntropyCoder::Arans),
+            2 => Ok(EntropyCoder::Cmodel),
             _ => Err(BiolepticError::InvalidEntropyCoder(value)),
         }
     }
@@ -165,8 +167,9 @@ pub struct BiolepticHeader {
     /// to allocate exactly the right buffer and detect truncated streams without having
     /// to rely on EOF.
     pub compressed_size: u32,
+    pub quant_multiplier: f32,
     /// Reserved for future use — must be zero.
-    pub reserved1: [u8; 16],
+    pub reserved1: [u8; 12],
 }
 
 impl BiolepticHeader {
@@ -183,6 +186,7 @@ impl BiolepticHeader {
         mean: f32,
         compressed_size: u32,
         entropy_coder: EntropyCoder,
+        quant_multiplier: f32,
     ) -> Self {
         let compression_method_impl: u32 = compression_method.into();
         Self {
@@ -198,7 +202,8 @@ impl BiolepticHeader {
             min: min.to_bits(),
             max: max.to_bits(),
             mean: mean.to_bits(),
-            reserved1: [0; 16],
+            quant_multiplier,
+            reserved1: [0; 12],
             compressed_size,
         }
     }
@@ -219,7 +224,8 @@ impl BiolepticHeader {
         buf[24..28].copy_from_slice(&self.max.to_le_bytes());
         buf[28..32].copy_from_slice(&self.mean.to_le_bytes());
         buf[32..36].copy_from_slice(&self.compressed_size.to_le_bytes());
-        buf[36..52].copy_from_slice(&self.reserved1);
+        buf[36..40].copy_from_slice(&self.quant_multiplier.to_le_bytes());
+        buf[40..52].copy_from_slice(&self.reserved1);
         buf
     }
 
@@ -236,7 +242,7 @@ impl BiolepticHeader {
             return Err(BiolepticError::InvalidMagic(magic));
         }
         let (major, minor) = (buf[4], buf[5]);
-        if major != 1 {
+        if major != FORMAT_MAJOR {
             return Err(BiolepticError::InvalidVersion([major, minor]));
         }
         let version: [u8; 2] = buf[4..6].try_into().unwrap();
@@ -282,7 +288,8 @@ impl BiolepticHeader {
             max: f_max,
             mean: f_mean,
             compressed_size: u32::from_le_bytes(buf[32..36].try_into().unwrap()),
-            reserved1: buf[36..52].try_into().unwrap(),
+            quant_multiplier: f32::from_le_bytes(buf[36..40].try_into().unwrap()),
+            reserved1: buf[40..52].try_into().unwrap(),
         })
     }
 
@@ -304,6 +311,15 @@ impl BiolepticHeader {
     /// Returns the compression method as an enum.
     pub fn compression_method(&self) -> Result<CompressionMethod, BiolepticError> {
         CompressionMethod::try_from(u32::from_le_bytes(self.compression_method))
+    }
+
+    pub fn quant_multiplier(&self) -> f32 {
+        let m = self.quant_multiplier;
+        if m.is_finite() && m > 0.0 {
+            m
+        } else {
+            (1u32 << self.scale) as f32
+        }
     }
 
     /// Returns the data type as an enum.

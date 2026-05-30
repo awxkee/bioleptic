@@ -612,7 +612,6 @@ pub fn decompress_multi(bytes: &[u8]) -> Result<Vec<Vec<f32>>, BiolepticError> {
 mod tests {
     use super::*;
     use crate::decompressor::decompress;
-    use std::{fs, io};
 
     /// Generates a synthetic PPG-like signal.
     /// Models the systolic peak, dicrotic notch, and diastolic peak.
@@ -773,148 +772,148 @@ mod tests {
         }
     }
 
-    #[derive(Clone, Copy, Debug)]
-    enum SampleFmt {
-        I16le,
-        F32le,
-    }
-
-    /// Load one channel of a raw (headerless) `.bin` as `f32`.
-    ///
-    /// * `channels` — interleave factor (1 = single lead, 2 = MIT-BIH, 12 = PTB-XL…)
-    /// * `channel`  — which 0-based channel to extract
-    /// * `skip`     — header bytes to drop before the samples (0 for raw dumps)
-    fn load_channel(
-        path: &str,
-        fmt: SampleFmt,
-        channels: usize,
-        channel: usize,
-        skip: usize,
-    ) -> io::Result<Vec<f32>> {
-        let raw = fs::read(path)?;
-        let body = &raw[skip.min(raw.len())..];
-
-        let all: Vec<f32> = match fmt {
-            SampleFmt::I16le => body
-                .chunks_exact(2)
-                .map(|b| i16::from_le_bytes([b[0], b[1]]) as f32)
-                .collect(),
-            SampleFmt::F32le => body
-                .chunks_exact(4)
-                .map(|b| f32::from_le_bytes([b[0], b[1], b[2], b[3]]))
-                .collect(),
-        };
-
-        // De-interleave: keep every `channels`-th sample starting at `channel`.
-        Ok(all
-            .into_iter()
-            .skip(channel)
-            .step_by(channels.max(1))
-            .collect())
-    }
-
-    /// When you don't know the format, print the first few samples under each
-    /// interpretation. ECG ADC values are typically small signed ints (|v| < ~5000);
-    /// f32 dumps look like sane physical magnitudes. The size hints also help:
-    /// a file divisible by 4 *might* be f32; one only divisible by 2 is i16.
-    fn sniff(path: &str) -> io::Result<()> {
-        let raw = fs::read(path)?;
-        println!(
-            "file: {} bytes  (÷2={}, ÷4={})",
-            raw.len(),
-            raw.len() % 2 == 0,
-            raw.len() % 4 == 0
-        );
-        let as_i16: Vec<i16> = raw
-            .chunks_exact(2)
-            .take(8)
-            .map(|b| i16::from_le_bytes([b[0], b[1]]))
-            .collect();
-        let as_f32: Vec<f32> = raw
-            .chunks_exact(4)
-            .take(8)
-            .map(|b| f32::from_le_bytes([b[0], b[1], b[2], b[3]]))
-            .collect();
-        println!("  as i16le: {:?}", as_i16);
-        println!("  as f32le: {:?}", as_f32);
-        Ok(())
-    }
-
-    /// Compress one window and report ratio + distortion.
-    fn test_window(seg: &[f32], opts: CompressionOptions) {
-        let raw_bytes = seg.len() * std::mem::size_of::<f32>();
-        let encoded = compress(seg, opts).expect("compress");
-        let decoded = decompress(&encoded).expect("decompress");
-        let cr = raw_bytes as f32 / encoded.len() as f32;
-        println!(
-            "  n={:6}  raw={:8}  comp={:7}  CR={:6.2}:1  PRD={:.3}%",
-            seg.len(),
-            raw_bytes,
-            encoded.len(),
-            cr,
-            prd(seg, &decoded)
-        );
-    }
-
-    /// Sweep the whole signal in fixed blocks and report the aggregate — a far more
-    /// honest figure than a single hand-picked window, since CR and PRD both depend
-    /// on block size (smaller blocks pay more fixed header per block).
-    fn sweep_blocks(sig: &[f32], block: usize, opts: CompressionOptions) {
-        let (mut raw_total, mut comp_total, mut prd_sum, mut nblocks) =
-            (0usize, 0usize, 0f64, 0usize);
-        for chunk in sig.chunks(block) {
-            if chunk.len() < 16 {
-                continue;
-            } // skip a tiny tail block
-            let encoded = compress(chunk, opts).expect("compress");
-            let decoded = decompress(&encoded).expect("decompress");
-            raw_total += chunk.len() * 4;
-            comp_total += encoded.len();
-            prd_sum += prd(chunk, &decoded);
-            nblocks += 1;
-        }
-        println!(
-            "  block={:5}: {} blocks  CR={:.2}:1  meanPRD={:.3}%",
-            block,
-            nblocks,
-            raw_total as f32 / comp_total as f32,
-            prd_sum / nblocks as f64
-        );
-    }
-
-    #[test]
-    fn test_coding2() {
-        sniff("./assets/ecg_aVR.bin").unwrap();
-        let r_means = load_channel("./assets/ecg_aVR.bin", SampleFmt::I16le, 7, 2, 0).unwrap();
-
-        let raw_bytes = r_means.len() * size_of::<f32>();
-
-        for coder in [
-            EntropyCoder::Deflate,
-            EntropyCoder::Arans,
-            EntropyCoder::Cmodel,
-        ] {
-            let encoded = compress(
-                &r_means,
-                CompressionOptions::from_method(CompressionMethod::Cdf97).with_entropy_coder(coder),
-            )
-            .unwrap();
-            let compressed_bytes = encoded.len();
-            let decompressed = decompress(&encoded).unwrap();
-            let cr = raw_bytes as f32 / compressed_bytes as f32;
-            let prd_val = prd(&r_means, &decompressed);
-            assert!(prd_val < 0.5, "got PRD {prd_val}");
-            println!(
-                "Entropy {:?} n={:5}  raw={:8}  compressed={:8}  cr={:6.2}:1  PRD={:.4}%",
-                coder,
-                r_means.len(),
-                raw_bytes,
-                compressed_bytes,
-                cr,
-                0.
-            );
-        }
-    }
+    // #[derive(Clone, Copy, Debug)]
+    // enum SampleFmt {
+    //     I16le,
+    //     F32le,
+    // }
+    //
+    // /// Load one channel of a raw (headerless) `.bin` as `f32`.
+    // ///
+    // /// * `channels` — interleave factor (1 = single lead, 2 = MIT-BIH, 12 = PTB-XL…)
+    // /// * `channel`  — which 0-based channel to extract
+    // /// * `skip`     — header bytes to drop before the samples (0 for raw dumps)
+    // fn load_channel(
+    //     path: &str,
+    //     fmt: SampleFmt,
+    //     channels: usize,
+    //     channel: usize,
+    //     skip: usize,
+    // ) -> io::Result<Vec<f32>> {
+    //     let raw = fs::read(path)?;
+    //     let body = &raw[skip.min(raw.len())..];
+    //
+    //     let all: Vec<f32> = match fmt {
+    //         SampleFmt::I16le => body
+    //             .chunks_exact(2)
+    //             .map(|b| i16::from_le_bytes([b[0], b[1]]) as f32)
+    //             .collect(),
+    //         SampleFmt::F32le => body
+    //             .chunks_exact(4)
+    //             .map(|b| f32::from_le_bytes([b[0], b[1], b[2], b[3]]))
+    //             .collect(),
+    //     };
+    //
+    //     // De-interleave: keep every `channels`-th sample starting at `channel`.
+    //     Ok(all
+    //         .into_iter()
+    //         .skip(channel)
+    //         .step_by(channels.max(1))
+    //         .collect())
+    // }
+    //
+    // /// When you don't know the format, print the first few samples under each
+    // /// interpretation. ECG ADC values are typically small signed ints (|v| < ~5000);
+    // /// f32 dumps look like sane physical magnitudes. The size hints also help:
+    // /// a file divisible by 4 *might* be f32; one only divisible by 2 is i16.
+    // fn sniff(path: &str) -> io::Result<()> {
+    //     let raw = fs::read(path)?;
+    //     println!(
+    //         "file: {} bytes  (÷2={}, ÷4={})",
+    //         raw.len(),
+    //         raw.len() % 2 == 0,
+    //         raw.len() % 4 == 0
+    //     );
+    //     let as_i16: Vec<i16> = raw
+    //         .chunks_exact(2)
+    //         .take(8)
+    //         .map(|b| i16::from_le_bytes([b[0], b[1]]))
+    //         .collect();
+    //     let as_f32: Vec<f32> = raw
+    //         .chunks_exact(4)
+    //         .take(8)
+    //         .map(|b| f32::from_le_bytes([b[0], b[1], b[2], b[3]]))
+    //         .collect();
+    //     println!("  as i16le: {:?}", as_i16);
+    //     println!("  as f32le: {:?}", as_f32);
+    //     Ok(())
+    // }
+    //
+    // /// Compress one window and report ratio + distortion.
+    // fn test_window(seg: &[f32], opts: CompressionOptions) {
+    //     let raw_bytes = seg.len() * std::mem::size_of::<f32>();
+    //     let encoded = compress(seg, opts).expect("compress");
+    //     let decoded = decompress(&encoded).expect("decompress");
+    //     let cr = raw_bytes as f32 / encoded.len() as f32;
+    //     println!(
+    //         "  n={:6}  raw={:8}  comp={:7}  CR={:6.2}:1  PRD={:.3}%",
+    //         seg.len(),
+    //         raw_bytes,
+    //         encoded.len(),
+    //         cr,
+    //         prd(seg, &decoded)
+    //     );
+    // }
+    //
+    // /// Sweep the whole signal in fixed blocks and report the aggregate — a far more
+    // /// honest figure than a single hand-picked window, since CR and PRD both depend
+    // /// on block size (smaller blocks pay more fixed header per block).
+    // fn sweep_blocks(sig: &[f32], block: usize, opts: CompressionOptions) {
+    //     let (mut raw_total, mut comp_total, mut prd_sum, mut nblocks) =
+    //         (0usize, 0usize, 0f64, 0usize);
+    //     for chunk in sig.chunks(block) {
+    //         if chunk.len() < 16 {
+    //             continue;
+    //         } // skip a tiny tail block
+    //         let encoded = compress(chunk, opts).expect("compress");
+    //         let decoded = decompress(&encoded).expect("decompress");
+    //         raw_total += chunk.len() * 4;
+    //         comp_total += encoded.len();
+    //         prd_sum += prd(chunk, &decoded);
+    //         nblocks += 1;
+    //     }
+    //     println!(
+    //         "  block={:5}: {} blocks  CR={:.2}:1  meanPRD={:.3}%",
+    //         block,
+    //         nblocks,
+    //         raw_total as f32 / comp_total as f32,
+    //         prd_sum / nblocks as f64
+    //     );
+    // }
+    //
+    // #[test]
+    // fn test_coding2() {
+    //     sniff("./assets/ecg_aVR.bin").unwrap();
+    //     let r_means = load_channel("./assets/ecg_aVR.bin", SampleFmt::I16le, 7, 2, 0).unwrap();
+    //
+    //     let raw_bytes = r_means.len() * size_of::<f32>();
+    //
+    //     for coder in [
+    //         EntropyCoder::Deflate,
+    //         EntropyCoder::Arans,
+    //         EntropyCoder::Cmodel,
+    //     ] {
+    //         let encoded = compress(
+    //             &r_means,
+    //             CompressionOptions::from_method(CompressionMethod::Cdf97).with_entropy_coder(coder),
+    //         )
+    //         .unwrap();
+    //         let compressed_bytes = encoded.len();
+    //         let decompressed = decompress(&encoded).unwrap();
+    //         let cr = raw_bytes as f32 / compressed_bytes as f32;
+    //         let prd_val = prd(&r_means, &decompressed);
+    //         assert!(prd_val < 0.5, "got PRD {prd_val}");
+    //         println!(
+    //             "Entropy {:?} n={:5}  raw={:8}  compressed={:8}  cr={:6.2}:1  PRD={:.4}%",
+    //             coder,
+    //             r_means.len(),
+    //             raw_bytes,
+    //             compressed_bytes,
+    //             cr,
+    //             0.
+    //         );
+    //     }
+    // }
 
     #[test]
     fn test_compress_to_prd() {

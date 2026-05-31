@@ -82,7 +82,6 @@ fn enc_put(x: &mut u32, freq: u32, start: u32, rev: &mut Vec<u8>) {
     *x = (*x / freq) * PROB_SCALE + (*x % freq) + start;
 }
 
-// ---- generic context-indexed binary rANS ----
 struct BinEnc {
     model: Vec<u16>,
     recs: Vec<(u32, u32)>,

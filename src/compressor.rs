@@ -916,9 +916,9 @@ mod tests {
     #[test]
     fn test_multichannel_roundtrip() {
         // Two correlated leads + one independent; equal length.
-        let a = generate_ppg(8000, 120., 90.);
+        let a = generate_ppg(7999, 120., 90.);
         let b: Vec<f32> = a.iter().map(|&x| x * 0.8 + 100.0).collect();
-        let c = generate_ppg(8000, 120., 75.);
+        let c = generate_ppg(7999, 120., 75.);
         let channels: Vec<&[f32]> = vec![&a, &b, &c];
 
         let opts = CompressionOptions::from_method(CompressionMethod::Cdf97)

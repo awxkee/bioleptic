@@ -5,7 +5,6 @@
 [![Crates.io](https://img.shields.io/crates/v/bioleptic.svg)](https://crates.io/crates/bioleptic)
 [![PyPI](https://img.shields.io/pypi/v/bioleptic-py.svg)](https://pypi.org/project/bioleptic-py/)
 [![npm](https://img.shields.io/npm/v/bioleptic-js.svg)](https://www.npmjs.com/package/bioleptic-js)
-[![License](https://img.shields.io/badge/license-BSD--3--Clause%20OR%20Apache--2.0-blue.svg)](#license)
 
 Bioleptic is a biosignal compression library that shrinks physiological time-series data — electrocardiogram (ECG), photoplethysmogram (PPG), and accelerometer streams — at high compression ratios with low reconstruction error (PRD). It combines a multi-level discrete wavelet transform (DWT) with scalar quantization and adaptive entropy coding, and runs natively in Rust or from Python (NumPy) and the browser (WebAssembly). That makes it a good fit for wearables, remote patient monitoring, medical-device storage, and large physiological datasets where bandwidth and disk are tight.
 
@@ -17,7 +16,6 @@ Bioleptic is a biosignal compression library that shrinks physiological time-ser
 - **Float32 and Float64 input** — f64 is downcast to f32 internally
 - **Cross-platform** — one core, with Rust, Python/NumPy, and JavaScript/WASM frontends
 - **Lightweight & dependency-light** — small footprint, suitable for embedded and edge use
-- **Permissively licensed** — BSD-3-Clause or Apache-2.0
 
 ## Algorithm
 
